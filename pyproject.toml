@@ -1,0 +1,35 @@
+[project]
+name = "AlphaStruct"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [
+    {name = "BerkinChen", email = "berkinchen@gmail.com"},
+]
+dependencies = [
+    "numpy>=2.3.2",
+    "torch @ https://download.pytorch.org/whl/cu121/torch-2.4.0%2Bcu121-cp311-cp311-linux_x86_64.whl",
+    "torchvision @ https://download.pytorch.org/whl/cu121/torchvision-0.19.0%2Bcu121-cp311-cp311-linux_x86_64.whl",
+    "torchaudio @ https://download.pytorch.org/whl/cu121/torchaudio-2.4.0%2Bcu121-cp311-cp311-linux_x86_64.whl",
+    "jinja2>=3.1.6",
+    "gymnasium>=1.2.0",
+    "stable-baselines3>=2.7.0",
+    "pandera>=0.25.0",
+    "pyqlib>=0.9.6",
+    "baostock>=0.8.9",
+    "sb3-contrib>=2.7.0",
+    "opencv-python>=4.11.0.86",
+    "joblib==1.3.2",
+    "tensorboard>=2.20.0",
+    "tensorflow>=2.20.0",
+    "seaborn>=0.13.2",
+]
+requires-python = ">=3.11"
+readme = "README.md"
+license = {text = "MIT"}
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm]
+distribution = true
