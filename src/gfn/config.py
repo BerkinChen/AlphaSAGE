@@ -2,12 +2,11 @@ from alphagen.data.expression import *
 from alphagen_qlib.stock_data import FeatureType
 
 # GFN Task Hyperparameters
-MAX_EXPR_LENGTH = 15
+MAX_EXPR_LENGTH = 20
 
 # GFN Model Hyperparameters
 HIDDEN_DIM = 128
 NUM_ENCODER_LAYERS = 2
-NUM_DECODER_LAYERS = 2
 NUM_HEADS = 4
 DROPOUT = 0.1
 
