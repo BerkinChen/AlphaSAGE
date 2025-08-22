@@ -23,7 +23,8 @@ QLIB_PATH = '/DATA1/home/chenbq/AlphaStruct/data/qlib_data/cn_data_rolling'
 
 def tokens_to_tensor(tokens: list, token_to_action):
     # The `+1` is for the padding value 0
-    token_indices = [token_to_action(token) + 1 for token in tokens]
+    # The first token is BEG, skip it.
+    token_indices = [token_to_action(token) + 1 for token in tokens[1:]]
     # Pad to max length
     padded_tokens = token_indices + [0] * (MAX_EXPR_LENGTH - len(token_indices))
     return torch.LongTensor(padded_tokens).unsqueeze(0)
@@ -94,12 +95,13 @@ def train(args):
     pool = AlphaPoolGFN(capacity=args.pool_capacity, stock_data=data, target=target)
 
     # Initialize environment and model
-    env = GFNEnv(GFNEnvCore(pool))
+    env = GFNEnv(GFNEnvCore(pool, eval_prob=args.eval_prob))
     model = GFNet(
         n_features=len(FEATURES),
         n_operators=len(OPERATORS),
         n_delta_times=len(DELTA_TIMES),
-        n_constants=len(CONSTANTS)
+        n_constants=len(CONSTANTS),
+        encoder_type=args.encoder_type
     )
     optimizer = Adam(model.parameters(), lr=LEARNING_RATE)
 
@@ -116,8 +118,8 @@ def train(args):
     # Training loop
     losses = []
     minibatch_loss = 0
-    update_freq = 128
-    n_episodes = 200_000
+    update_freq = args.update_freq
+    n_episodes = args.n_episodes
 
     for episode in range(n_episodes):
         obs, info = env.reset()
@@ -173,5 +175,9 @@ if __name__ == '__main__':
     parser.add_argument('--instrument', type=str, default='csi300')
     parser.add_argument('--pool_capacity', type=int, default=20)
     parser.add_argument('--log_freq', type=int, default=100)
+    parser.add_argument('--eval_prob', type=float, default=0.5)
+    parser.add_argument('--update_freq', type=int, default=128)
+    parser.add_argument('--n_episodes', type=int, default=2_000)
+    parser.add_argument('--encoder_type', type=str, default='lstm', choices=['transformer', 'lstm'])
     args = parser.parse_args()
     train(args)
