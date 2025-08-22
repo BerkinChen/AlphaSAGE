@@ -159,11 +159,11 @@ def run(args):
     target = Ref(close, -20) / close - 1
     
     train_start_time = '2010-01-01'
-    train_end_time = f'{args.train_end_year}-12-31'
-    valid_start_time = f'{args.train_end_year + 1}-01-01'
-    valid_end_time = f'{args.train_end_year + 1}-12-31'
-    test_start_time = f'{args.train_end_year + 2}-01-01'
-    test_end_time = f'{args.train_end_year + 2}-12-31'
+    train_end_time = '2020-12-31'
+    valid_start_time = '2021-01-01'
+    valid_end_time = '2021-12-31'
+    test_start_time = '2022-01-01'
+    test_end_time = '2024-12-31'
 
     data = StockData(instrument=args.instruments,
                            start_time=train_start_time,
