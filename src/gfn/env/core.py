@@ -1,3 +1,4 @@
+import random
 from typing import List, Tuple, Optional
 import gymnasium as gym
 import torch
@@ -9,10 +10,11 @@ from ..alpha_pool import AlphaPoolGFN
 
 
 class GFNEnvCore(gym.Env):
-    def __init__(self, pool: AlphaPoolGFN, device: torch.device = torch.device('cuda:0')):
+    def __init__(self, pool: AlphaPoolGFN, eval_prob: float = 0.5, device: torch.device = torch.device('cuda:0')):
         super().__init__()
         self._device = device
         self.pool = pool
+        self.eval_prob = eval_prob
         self.eval_cnt = 0
         self.reset()
 
@@ -34,7 +36,10 @@ class GFNEnvCore(gym.Env):
             self._tokens.append(action)
             self._builder.add_token(action)
             done = False
-            reward = 0.0
+            if random.random() < self.eval_prob and self._builder.is_valid():
+                reward = self._evaluate()
+            else:
+                reward = 0.0
         else:
             done = True
             reward = self._evaluate() if self._builder.is_valid() else -1.
