@@ -7,17 +7,23 @@ import json
 from datetime import datetime
 from torch.optim import Adam
 from torch.distributions import Categorical
+from torch import nn
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 from alphagen.rl.env.wrapper import action2token
-from src.gfn.config import *
-from src.gfn.env import GFNEnv, GFNEnvCore
-from src.gfn.model import GFNet
-from src.gfn.loss import trajectory_balance_loss
-from src.gfn.alpha_pool import AlphaPoolGFN
+
+from src.alpha_gfn.config import *
+from src.alpha_gfn.env.core import GFNEnvCore
+from src.alpha_gfn.modules import SequenceTransformer
+from src.alpha_gfn.alpha_pool import AlphaPoolGFN
 from src.alphagen.data.expression import *
 from src.alphagen_qlib.stock_data import StockData
 from src.alphagen.utils.correlation import batch_pearsonr
+
+from gfn.samplers import Sampler
+from gfn.gflownet.trajectory_balance import TBGFlowNet
+from gfn.modules import DiscretePolicyEstimator
+from gfn.utils.modules import NeuralNet
 
 QLIB_PATH = '/DATA1/home/chenbq/AlphaStruct/data/qlib_data/cn_data_rolling'
 
@@ -31,7 +37,7 @@ def tokens_to_tensor(tokens: list, token_to_action):
 
 
 class GFNLogger:
-    def __init__(self, model: GFNet, pool: AlphaPoolGFN, log_dir: str, test_data: StockData, target: Expression):
+    def __init__(self, model: nn.Module, pool: AlphaPoolGFN, log_dir: str, test_data: StockData, target: Expression):
         self.model = model
         self.pool = pool
         self.log_dir = log_dir
@@ -85,6 +91,8 @@ def train(args):
     random.seed(args.seed)
     np.random.seed(args.seed)
 
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
     # Initialize StockData and target expression
     data = StockData(instrument=args.instrument, start_time='2010-01-01', end_time='2020-12-31', qlib_path=QLIB_PATH)
     data_test = StockData(instrument=args.instrument, start_time='2022-01-01', end_time='2024-12-31', qlib_path=QLIB_PATH)
@@ -95,15 +103,28 @@ def train(args):
     pool = AlphaPoolGFN(capacity=args.pool_capacity, stock_data=data, target=target)
 
     # Initialize environment and model
-    env = GFNEnv(GFNEnvCore(pool, eval_prob=args.eval_prob))
-    model = GFNet(
-        n_features=len(FEATURES),
-        n_operators=len(OPERATORS),
-        n_delta_times=len(DELTA_TIMES),
-        n_constants=len(CONSTANTS),
-        encoder_type=args.encoder_type
-    )
-    optimizer = Adam(model.parameters(), lr=LEARNING_RATE)
+    env = GFNEnvCore(pool=pool, device=device)
+    
+    n_tokens = len(FEATURES) + len(OPERATORS) + len(DELTA_TIMES) + len(CONSTANTS)
+    
+    backbone = SequenceTransformer(n_tokens, args.encoder_type)
+    
+    pf_head = NeuralNet(input_dim=HIDDEN_DIM, output_dim=env.n_actions, n_hidden_layers=0)
+    pb_head = NeuralNet(input_dim=HIDDEN_DIM, output_dim=env.n_actions - 1, n_hidden_layers=0) # pb does not predict exit action
+    
+    pf_module = nn.Sequential(backbone, pf_head)
+    pb_module = nn.Sequential(backbone, pb_head)
+    
+    pf = DiscretePolicyEstimator(pf_module, n_actions=env.n_actions, preprocessor=env.preprocessor)
+    pb = DiscretePolicyEstimator(pb_module, n_actions=env.n_actions, preprocessor=env.preprocessor, is_backward=True)
+
+    loss_fn = TBGFlowNet(pf=pf, pb=pb)
+    loss_fn.to(device)
+    sampler = Sampler(estimator=pf)
+    
+    params = list(backbone.parameters()) + list(pf_head.parameters()) + list(pb_head.parameters()) + [loss_fn.logZ]
+    optimizer = Adam(params, lr=LEARNING_RATE)
+
 
     # Setup logging
     timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
@@ -113,7 +134,7 @@ def train(args):
         f'gfn_{args.instrument}_{args.pool_capacity}_{args.seed}-{timestamp}'
     )
     os.makedirs(log_dir, exist_ok=True)
-    logger = GFNLogger(model, pool, log_dir, data_test, target)
+    logger = GFNLogger(pf, pool, log_dir, data_test, target)
 
     # Training loop
     losses = []
@@ -121,37 +142,12 @@ def train(args):
     update_freq = args.update_freq
     n_episodes = args.n_episodes
 
-    for episode in range(n_episodes):
-        obs, info = env.reset()
-        done = False
-        
-        total_log_P_F = 0
-        total_log_P_B = 0
-        
-        for t in range(MAX_EXPR_LENGTH):
-            state_tensor = tokens_to_tensor(obs, env.token_to_action)
-            pf_logits, pb_logits = model(state_tensor)
-            mask = torch.tensor(info['valid_actions'])
-            pf_logits = torch.where(mask, pf_logits, torch.tensor(-1e6))
-            
-            categorical = Categorical(logits=pf_logits)
-            action = categorical.sample()
-            total_log_P_F += categorical.log_prob(action)
-            
-            obs, reward, done, _, info = env.step(action.item())
+    for episode in tqdm(range(n_episodes)):
+        trajectories = sampler.sample_trajectories(env=env, n_trajectories=1)
+        loss = loss_fn.loss(env=env, trajectories=trajectories)
 
-            new_state_tensor = tokens_to_tensor(obs, env.token_to_action)
-            _, new_pb_logits = model(new_state_tensor)
-            total_log_P_B += Categorical(logits=new_pb_logits).log_prob(action)
-
-            if done:
-                break
-        
-        if done and reward > -1:
-            log_reward = torch.log(torch.clamp(torch.tensor(reward), min=1e-9))
-            minibatch_loss += trajectory_balance_loss(
-                model.logZ, total_log_P_F, total_log_P_B, log_reward
-            )
+        if loss is not None and torch.isfinite(loss):
+            minibatch_loss += loss
             
         if episode > 0 and episode % update_freq == 0 and minibatch_loss != 0:
             losses.append(minibatch_loss.item())
@@ -173,9 +169,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--instrument', type=str, default='csi300')
-    parser.add_argument('--pool_capacity', type=int, default=20)
+    parser.add_argument('--pool_capacity', type=int, default=10)
     parser.add_argument('--log_freq', type=int, default=100)
-    parser.add_argument('--eval_prob', type=float, default=0.5)
+    parser.add_argument('--eval_prob', type=float, default=0.3)
     parser.add_argument('--update_freq', type=int, default=128)
     parser.add_argument('--n_episodes', type=int, default=2_000)
     parser.add_argument('--encoder_type', type=str, default='lstm', choices=['transformer', 'lstm'])

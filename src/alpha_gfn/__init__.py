@@ -2,6 +2,4 @@
 
 from . import config
 from . import env
-from . import loss
-from . import model
 from . import alpha_pool
