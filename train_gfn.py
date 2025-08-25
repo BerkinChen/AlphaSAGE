@@ -14,7 +14,7 @@ from alphagen.rl.env.wrapper import action2token
 
 from src.alpha_gfn.config import *
 from src.alpha_gfn.env.core import GFNEnvCore
-from src.alpha_gfn.modules import SequenceTransformer
+from src.alpha_gfn.modules import SequenceEncoder
 from src.alpha_gfn.alpha_pool import AlphaPoolGFN
 from src.alphagen.data.expression import *
 from src.alphagen_qlib.stock_data import StockData
@@ -107,7 +107,10 @@ def train(args):
     
     n_tokens = len(FEATURES) + len(OPERATORS) + len(DELTA_TIMES) + len(CONSTANTS)
     
-    backbone = SequenceTransformer(n_tokens, args.encoder_type)
+    backbone = SequenceEncoder(
+        n_tokens,
+        args.encoder_type
+    )
     
     pf_head = NeuralNet(input_dim=HIDDEN_DIM, output_dim=env.n_actions, n_hidden_layers=0)
     pb_head = NeuralNet(input_dim=HIDDEN_DIM, output_dim=env.n_actions - 1, n_hidden_layers=0) # pb does not predict exit action
@@ -174,6 +177,6 @@ if __name__ == '__main__':
     parser.add_argument('--eval_prob', type=float, default=0.3)
     parser.add_argument('--update_freq', type=int, default=128)
     parser.add_argument('--n_episodes', type=int, default=2_000)
-    parser.add_argument('--encoder_type', type=str, default='lstm', choices=['transformer', 'lstm'])
+    parser.add_argument('--encoder_type', type=str, default='lstm', choices=['transformer', 'lstm', 'gnn'])
     args = parser.parse_args()
     train(args)
