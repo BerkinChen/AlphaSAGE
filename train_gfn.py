@@ -19,11 +19,13 @@ from src.alpha_gfn.alpha_pool import AlphaPoolGFN
 from src.alphagen.data.expression import *
 from src.alphagen_qlib.stock_data import StockData
 from src.alphagen.utils.correlation import batch_pearsonr
+from src.alpha_gfn.gflownet import EntropyTBGFlowNet
 
 from gfn.samplers import Sampler
 from gfn.gflownet.trajectory_balance import TBGFlowNet
 from gfn.modules import DiscretePolicyEstimator
 from gfn.utils.modules import NeuralNet
+
 
 QLIB_PATH = '/DATA1/home/chenbq/AlphaStruct/data/qlib_data/cn_data_rolling'
 
@@ -121,7 +123,12 @@ def train(args):
     pf = DiscretePolicyEstimator(pf_module, n_actions=env.n_actions, preprocessor=env.preprocessor)
     pb = DiscretePolicyEstimator(pb_module, n_actions=env.n_actions, preprocessor=env.preprocessor, is_backward=True)
 
-    loss_fn = TBGFlowNet(pf=pf, pb=pb)
+    loss_fn = EntropyTBGFlowNet(
+        pf=pf,
+        pb=pb,
+        entropy_coef=args.entropy_coef,
+        entropy_temperature=args.entropy_temperature
+    )
     loss_fn.to(device)
     sampler = Sampler(estimator=pf)
     
@@ -134,7 +141,7 @@ def train(args):
     log_dir = os.path.join(
         'data/gfn_logs',
         f'pool_{args.pool_capacity}',
-        f'gfn_{args.instrument}_{args.pool_capacity}_{args.seed}-{timestamp}'
+        f'gfn_{args.encoder_type}_{args.instrument}_{args.pool_capacity}_{args.seed}-{timestamp}'
     )
     os.makedirs(log_dir, exist_ok=True)
     logger = GFNLogger(pf, pool, log_dir, data_test, target)
@@ -146,7 +153,10 @@ def train(args):
     n_episodes = args.n_episodes
 
     for episode in tqdm(range(n_episodes)):
-        trajectories = sampler.sample_trajectories(env=env, n_trajectories=1)
+        save_estimator_outputs = args.entropy_coef > 0
+        trajectories = sampler.sample_trajectories(
+            env=env, n_trajectories=1, save_estimator_outputs=save_estimator_outputs
+        )
         loss = loss_fn.loss(env=env, trajectories=trajectories)
 
         if loss is not None and torch.isfinite(loss):
@@ -174,9 +184,10 @@ if __name__ == '__main__':
     parser.add_argument('--instrument', type=str, default='csi300')
     parser.add_argument('--pool_capacity', type=int, default=10)
     parser.add_argument('--log_freq', type=int, default=100)
-    parser.add_argument('--eval_prob', type=float, default=0.3)
     parser.add_argument('--update_freq', type=int, default=128)
     parser.add_argument('--n_episodes', type=int, default=2_000)
     parser.add_argument('--encoder_type', type=str, default='lstm', choices=['transformer', 'lstm', 'gnn'])
+    parser.add_argument('--entropy_coef', type=float, default=0.01, help='Coefficient for entropy regularization')
+    parser.add_argument('--entropy_temperature', type=float, default=1.0, help='Temperature for entropy calculation')
     args = parser.parse_args()
     train(args)
