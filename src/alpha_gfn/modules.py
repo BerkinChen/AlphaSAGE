@@ -2,11 +2,12 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 import math
-from torch_geometric.nn import GCNConv, global_mean_pool
+from torch_geometric.nn import global_mean_pool, RGCNConv
 from torch_geometric.data import Data, Batch
 
 from .config import *
 from alphagen.data.tokens import *
+from alphagen.data.expression import *
 from alphagen.rl.env.wrapper import action2token
 
 def _build_graph_from_rpn(token_ids: list[int], token_embedding_layer: nn.Embedding, beg_token_id: int) -> Data:
@@ -19,25 +20,55 @@ def _build_graph_from_rpn(token_ids: list[int], token_embedding_layer: nn.Embedd
             tokens.append(action2token(tid))
     
     edges = []
+    edge_types = []
     stack = []
+    UNARY_OPS = ['Abs', 'SLog1p', 'Inv', 'Sign', 'Log', 'Rank']
+    COMMUTATIVE_OPS = ['Add', 'Mul']
+    NON_COMMUTATIVE_OPS = ['Sub', 'Div', 'Pow', 'Greater', 'Less']
+    ROLLING_OPS = ['Ref', 'TsMean', 'TsSum', 'TsStd', 'TsIr', 'TsMinMaxDiff', 'TsMaxDiff', 'TsMinDiff', 'TsVar', 'TsSkew', 'TsKurt', 'TsMax', 'TsMin',
+        'TsMed', 'TsMad', 'TsRank', 'TsDelta', 'TsDiv', 'TsPctChange', 'TsWMA', 'TsEMA']
+    PAIR_ROLLING_OPS = ['TsCov', 'TsCorr']
+
     for j, token in enumerate(tokens):
         if isinstance(token, OperatorToken):
-            n_args = token.operator.n_args()
+            op = token.operator
+            n_args = op.n_args()
             if len(stack) < n_args: continue
-            for _ in range(n_args):
+            
+            for i in range(n_args):
                 child_node_idx = stack.pop()
                 edges.append((child_node_idx, j))
+                
+                if op.__name__ in UNARY_OPS:
+                    edge_types.append(0)  # Unary operand
+                elif op.__name__ in COMMUTATIVE_OPS:
+                    edge_types.append(1)  # Commutative binary operand
+                elif op.__name__ in NON_COMMUTATIVE_OPS:  # Non-commutative binary
+                    # The first pop (i=0) is the right-most operand in an expression
+                    if i == 0:
+                        edge_types.append(3)  # Right operand
+                    else:
+                        edge_types.append(2)  # Left operand
+                elif op.__name__ in ROLLING_OPS or op.__name__ in PAIR_ROLLING_OPS:
+                    if i == 0:
+                        edge_types.append(5)  # Time series operand
+                    else:
+                        edge_types.append(4)  # Feature operand
+                else:
+                    raise TypeError(f"Unknown operator: {op.__name__}")
         stack.append(j)
 
     if not edges:
         edge_index = torch.empty((2, 0), dtype=torch.long, device=device)
+        edge_type = torch.empty((0,), dtype=torch.long, device=device)
     else:
         edge_index = torch.tensor(edges, dtype=torch.long, device=device).t().contiguous()
+        edge_type = torch.tensor(edge_types, dtype=torch.long, device=device)
     
     node_feature_ids = torch.tensor(token_ids, device=device)
     x = token_embedding_layer(node_feature_ids)
     
-    return Data(x=x, edge_index=edge_index)
+    return Data(x=x, edge_index=edge_index, edge_type=edge_type)
 
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model: int, max_len: int = 5000):
@@ -56,15 +87,16 @@ class PositionalEncoding(nn.Module):
 class GNNEncoder(nn.Module):
     def __init__(self, input_dim, hidden_dim, n_layers=2):
         super().__init__()
+        self.num_relations = 6  # 0: unary, 1: commutative, 2: left, 3: right, 4: feature, 5: time series
         self.layers = nn.ModuleList()
-        self.layers.append(GCNConv(input_dim, hidden_dim))
+        self.layers.append(RGCNConv(input_dim, hidden_dim, self.num_relations))
         for _ in range(n_layers - 1):
-            self.layers.append(GCNConv(hidden_dim, hidden_dim))
+            self.layers.append(RGCNConv(hidden_dim, hidden_dim, self.num_relations))
         
     def forward(self, data: Batch):
-        x, edge_index, batch = data.x, data.edge_index, data.batch
+        x, edge_index, edge_type, batch = data.x, data.edge_index, data.edge_type, data.batch
         for layer in self.layers:
-            x = torch.relu(layer(x, edge_index))
+            x = torch.relu(layer(x, edge_index, edge_type))
         
         return global_mean_pool(x, batch)
 

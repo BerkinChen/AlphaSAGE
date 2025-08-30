@@ -185,7 +185,7 @@ if __name__ == '__main__':
     parser.add_argument('--pool_capacity', type=int, default=10)
     parser.add_argument('--log_freq', type=int, default=100)
     parser.add_argument('--update_freq', type=int, default=128)
-    parser.add_argument('--n_episodes', type=int, default=2_000)
+    parser.add_argument('--n_episodes', type=int, default=1_000)
     parser.add_argument('--encoder_type', type=str, default='lstm', choices=['transformer', 'lstm', 'gnn'])
     parser.add_argument('--entropy_coef', type=float, default=0.01, help='Coefficient for entropy regularization')
     parser.add_argument('--entropy_temperature', type=float, default=1.0, help='Temperature for entropy calculation')
