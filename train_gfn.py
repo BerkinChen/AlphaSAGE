@@ -29,13 +29,6 @@ from gfn.utils.modules import NeuralNet
 
 QLIB_PATH = '/DATA1/home/chenbq/AlphaStruct/data/qlib_data/cn_data_rolling'
 
-def tokens_to_tensor(tokens: list, token_to_action):
-    # The `+1` is for the padding value 0
-    # The first token is BEG, skip it.
-    token_indices = [token_to_action(token) + 1 for token in tokens[1:]]
-    # Pad to max length
-    padded_tokens = token_indices + [0] * (MAX_EXPR_LENGTH - len(token_indices))
-    return torch.LongTensor(padded_tokens).unsqueeze(0)
 
 
 class GFNLogger:

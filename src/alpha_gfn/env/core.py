@@ -17,15 +17,17 @@ class GFNEnvCore(DiscreteEnv):
         self.pool = pool
         self.builder = ExpressionBuilder()
         
+        self.beg_token = [BEG_TOKEN]
         self.operators = [OperatorToken(op) for op in OPERATORS]
         self.features = [FeatureToken(feat) for feat in FEATURES]
         self.delta_times = [DeltaTimeToken(dt) for dt in DELTA_TIMES]
         self.constants = [ConstantToken(c) for c in CONSTANTS]
-        self.action_list: List[Token] = self.operators + self.features + self.delta_times + self.constants
+        self.sep_token = [SEP_TOKEN]
+        self.action_list: List[Token] = self.beg_token + self.operators + self.features + self.delta_times + self.constants + self.sep_token
         self.id_to_token_map = {i: token for i, token in enumerate(self.action_list)}
-        n_actions = len(self.action_list) + 1  # Add 1 for the exit action
-        
-        s0 = torch.tensor([self.token_to_id_map[BEG_TOKEN]] + [0] * (MAX_EXPR_LENGTH - 1), dtype=torch.long, device=device)
+        n_actions = len(self.action_list)
+        print(self.token_to_id_map)
+        s0 = torch.tensor([self.token_to_id_map[BEG_TOKEN]] + [-1] * (MAX_EXPR_LENGTH - 1), dtype=torch.long, device=device)
         sf = torch.full((MAX_EXPR_LENGTH,), -1, dtype=torch.long, device=device)
         preprocessor = IntegerPreprocessor(output_dim=MAX_EXPR_LENGTH)
         
@@ -34,6 +36,8 @@ class GFNEnvCore(DiscreteEnv):
             s0=s0,
             sf=sf,
             state_shape=(MAX_EXPR_LENGTH,),
+            dummy_action=torch.tensor([-1], dtype=torch.long, device=device),
+            exit_action=torch.tensor([self.token_to_id_map[SEP_TOKEN]], dtype=torch.long, device=device),
             device_str=str(device),
             preprocessor=preprocessor
         )
@@ -42,7 +46,6 @@ class GFNEnvCore(DiscreteEnv):
     def token_to_id_map(self):
         # The last action is the exit action
         mapping = {token: i for i, token in enumerate(self.action_list)}
-        mapping[BEG_TOKEN] = len(self.action_list) + 1 
         return mapping
 
     def tensor_to_tokens(self, tensor: torch.Tensor) -> List[Optional[Token]]:
@@ -52,8 +55,8 @@ class GFNEnvCore(DiscreteEnv):
         next_states_tensor = states.tensor.clone()
         for i, (state_tensor, action_id_tensor) in enumerate(zip(states.tensor, actions.tensor.squeeze(-1))):
             action_id = action_id_tensor.item()
-            if action_id < len(self.action_list): # Not an exit action
-                non_padded_len = (state_tensor != 0).sum()
+            if self.id_to_token_map[action_id] != SEP_TOKEN: # Not an exit action
+                non_padded_len = (state_tensor != -1).sum()
                 if non_padded_len < MAX_EXPR_LENGTH:
                     next_states_tensor[i, non_padded_len] = action_id
         return next_states_tensor
@@ -70,24 +73,26 @@ class GFNEnvCore(DiscreteEnv):
                 continue
 
             builder = ExpressionBuilder()
-            token_ids = [tid.item() for tid in state_tensor if tid > 0]
+            token_ids = [tid.item() for tid in state_tensor if tid >= 0]
             for token_id in token_ids[1:]:
                 builder.add_token(self.id_to_token_map[token_id])
 
             valid_actions = [False] * self.n_actions
             
+            # Account for BEG_TOKEN at index 0
+            beg_offset = len(self.beg_token)  # = 1
             n_ops = len(self.operators)
             n_features = len(self.features)
             n_dts = len(self.delta_times)
 
             for i, op_token in enumerate(self.operators):
-                valid_actions[i] = builder.validate_op(op_token.operator)
-            for i in range(len(self.features)):
-                valid_actions[n_ops + i] = builder.validate_feature()
-            for i in range(len(self.delta_times)):
-                valid_actions[n_ops + n_features + i] = builder.validate_dt()
-            for i in range(len(self.constants)):
-                valid_actions[n_ops + n_features + n_dts + i] = builder.validate_const()
+                valid_actions[beg_offset + i] = builder.validate(op_token)
+            for i, feature_token in enumerate(self.features):
+                valid_actions[beg_offset + n_ops + i] = builder.validate(feature_token)
+            for i, dt_token in enumerate(self.delta_times):
+                valid_actions[beg_offset + n_ops + n_features + i] = builder.validate(dt_token)
+            for i, const_token in enumerate(self.constants):
+                valid_actions[beg_offset + n_ops + n_features + n_dts + i] = builder.validate(const_token)
 
             if len(token_ids) < MAX_EXPR_LENGTH:
                 if builder.is_valid():
@@ -103,7 +108,7 @@ class GFNEnvCore(DiscreteEnv):
         rewards = []
         for state_tensor in final_states.tensor:
             builder = ExpressionBuilder()
-            token_ids = [tid.item() for tid in state_tensor if tid > 0]
+            token_ids = [tid.item() for tid in state_tensor if tid >= 0]
             
             # Reconstruct the expression for reward calculation
             for token_id in token_ids[1:]:
@@ -113,6 +118,7 @@ class GFNEnvCore(DiscreteEnv):
             if builder.is_valid():
                 try:
                     expr = builder.get_tree()
+
                     reward = self.pool.try_new_expr(expr)
                 except OutOfDataRangeError:
                     reward = 0.0

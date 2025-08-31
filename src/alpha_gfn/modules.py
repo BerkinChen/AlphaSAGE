@@ -105,9 +105,9 @@ class SequenceEncoder(nn.Module):
         super().__init__()
         self.encoder_type = encoder_type
         self.n_tokens = n_tokens
-        self.beg_token_id = self.n_tokens + 1
+        self.beg_token_id = 0
         
-        self.token_embedding = nn.Embedding(self.n_tokens + 2, HIDDEN_DIM, padding_idx=0)
+        self.token_embedding = nn.Embedding(self.n_tokens + 2, HIDDEN_DIM, padding_idx=-1)
         
         if encoder_type == 'transformer':
             self.pos_enc = PositionalEncoding(HIDDEN_DIM)
@@ -128,7 +128,7 @@ class SequenceEncoder(nn.Module):
             raise ValueError(f"Unknown encoder type: {encoder_type}")
 
     def _make_padding_mask(self, tokens: Tensor) -> Tensor:
-        return tokens == 0
+        return tokens == -1
         
     def forward(self, state_tokens: Tensor):
         bs = state_tokens.shape[0]
@@ -136,7 +136,7 @@ class SequenceEncoder(nn.Module):
         if self.encoder_type == 'gnn':
             data_list = []
             for i in range(bs):
-                token_ids = [tid for tid in state_tokens[i].tolist() if tid > 0]
+                token_ids = [tid for tid in state_tokens[i].tolist() if tid > -1]
                 graph_data = _build_graph_from_rpn(
                     token_ids,
                     self.token_embedding,
