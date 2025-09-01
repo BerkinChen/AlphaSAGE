@@ -28,7 +28,9 @@ class GFNEnvCore(DiscreteEnv):
         n_actions = len(self.action_list)
         print(self.token_to_id_map)
         s0 = torch.tensor([self.token_to_id_map[BEG_TOKEN]] + [-1] * (MAX_EXPR_LENGTH - 1), dtype=torch.long, device=device)
-        sf = torch.full((MAX_EXPR_LENGTH,), -1, dtype=torch.long, device=device)
+        # Sink state: a special state that represents completed trajectories
+        # We use -2 to distinguish it from the padding value -1
+        sf = torch.full((MAX_EXPR_LENGTH,), self.token_to_id_map[SEP_TOKEN], dtype=torch.long, device=device)
         preprocessor = IntegerPreprocessor(output_dim=MAX_EXPR_LENGTH)
         
         super().__init__(
@@ -55,7 +57,10 @@ class GFNEnvCore(DiscreteEnv):
         next_states_tensor = states.tensor.clone()
         for i, (state_tensor, action_id_tensor) in enumerate(zip(states.tensor, actions.tensor.squeeze(-1))):
             action_id = action_id_tensor.item()
-            if self.id_to_token_map[action_id] != SEP_TOKEN: # Not an exit action
+            if self.id_to_token_map[action_id] == SEP_TOKEN: # Exit action - transition to sink state
+                print(f"🏁 Trajectory {i} completed - transitioning to sink state")
+                next_states_tensor[i] = self.sf
+            else: # Not an exit action
                 non_padded_len = (state_tensor != -1).sum()
                 if non_padded_len < MAX_EXPR_LENGTH:
                     next_states_tensor[i, non_padded_len] = action_id
@@ -68,7 +73,7 @@ class GFNEnvCore(DiscreteEnv):
     def update_masks(self, states: DiscreteStates):
         batch_masks = []
         for state_tensor in states.tensor:
-            if torch.all(state_tensor == self.sf):
+            if torch.all(state_tensor == self.sf):  # This is a sink state
                 batch_masks.append([False] * self.n_actions)
                 continue
 
@@ -118,7 +123,6 @@ class GFNEnvCore(DiscreteEnv):
             if builder.is_valid():
                 try:
                     expr = builder.get_tree()
-
                     reward = self.pool.try_new_expr(expr)
                 except OutOfDataRangeError:
                     reward = 0.0
@@ -126,3 +130,63 @@ class GFNEnvCore(DiscreteEnv):
             rewards.append(reward)
         
         return torch.tensor(rewards, dtype=torch.float, device=self.device)
+    
+    def reward_with_embedding(
+        self, 
+        final_states: DiscreteStates, 
+        embeddings: torch.Tensor,
+        ssl_loss_fn = None
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        计算奖励，同时考虑表达式奖励和SSL奖励
+        
+        Args:
+            final_states: 最终状态
+            embeddings: 对应的embedding
+            ssl_loss_fn: SSL损失函数
+            
+        Returns:
+            base_rewards: 基础表达式奖励
+            ssl_rewards: SSL奖励
+        """
+        base_rewards = []
+        ssl_rewards = []
+        
+        for i, state_tensor in enumerate(final_states.tensor):
+            builder = ExpressionBuilder()
+            token_ids = [tid.item() for tid in state_tensor if tid >= 0]
+            
+            # Reconstruct the expression for reward calculation
+            for token_id in token_ids[1:]:
+                builder.add_token(self.id_to_token_map[token_id])
+
+            base_reward = 0.0
+            ssl_reward = 0.0
+            
+            if builder.is_valid():
+                try:
+                    expr = builder.get_tree()
+                    state_key = str(state_tensor.clone().detach().cpu().tolist())
+                    embedding = embeddings[i] if i < len(embeddings) else None
+                    
+                    # 尝试添加到池中并获取IC值
+                    ic_value = self.pool.try_new_expr_with_embedding(expr, embedding, state_key)
+                    base_reward = ic_value
+                    
+                    # 计算SSL奖励
+                    if ssl_loss_fn is not None and embedding is not None:
+                        ssl_reward, _ = self.pool.compute_ssl_reward_from_pool(
+                            ssl_loss_fn, embedding, ic_value
+                        )
+                    
+                except OutOfDataRangeError:
+                    base_reward = 0.0
+                    ssl_reward = 0.0
+            
+            base_rewards.append(base_reward)
+            ssl_rewards.append(ssl_reward)
+        
+        return (
+            torch.tensor(base_rewards, dtype=torch.float, device=self.device),
+            torch.tensor(ssl_rewards, dtype=torch.float, device=self.device)
+        )
