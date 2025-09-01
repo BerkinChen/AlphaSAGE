@@ -2,6 +2,7 @@ import random
 from typing import List, Tuple, Optional
 import torch
 import math
+from torch import nn
 from gfn.env import DiscreteEnv
 from gfn.states import DiscreteStates
 from gfn.actions import Actions
@@ -13,8 +14,9 @@ from ..alpha_pool import AlphaPoolGFN
 from ..preprocessors import IntegerPreprocessor
 
 class GFNEnvCore(DiscreteEnv):
-    def __init__(self, pool: AlphaPoolGFN, device: torch.device = torch.device('cuda:0')):
+    def __init__(self, pool: AlphaPoolGFN, encoder: nn.Module = None, device: torch.device = torch.device('cuda:0')):
         self.pool = pool
+        self.encoder = encoder
         self.builder = ExpressionBuilder()
         
         self.beg_token = [BEG_TOKEN]
@@ -50,6 +52,9 @@ class GFNEnvCore(DiscreteEnv):
         mapping = {token: i for i, token in enumerate(self.action_list)}
         return mapping
 
+    def set_encoder(self, encoder: nn.Module):
+        self.encoder = encoder
+
     def tensor_to_tokens(self, tensor: torch.Tensor) -> List[Optional[Token]]:
         return [self.id_to_token_map.get(i.item()) for i in tensor]
         
@@ -58,7 +63,6 @@ class GFNEnvCore(DiscreteEnv):
         for i, (state_tensor, action_id_tensor) in enumerate(zip(states.tensor, actions.tensor.squeeze(-1))):
             action_id = action_id_tensor.item()
             if self.id_to_token_map[action_id] == SEP_TOKEN: # Exit action - transition to sink state
-                print(f"🏁 Trajectory {i} completed - transitioning to sink state")
                 next_states_tensor[i] = self.sf
             else: # Not an exit action
                 non_padded_len = (state_tensor != -1).sum()
@@ -111,6 +115,7 @@ class GFNEnvCore(DiscreteEnv):
 
     def reward(self, final_states: DiscreteStates) -> torch.Tensor:
         rewards = []
+        
         for state_tensor in final_states.tensor:
             builder = ExpressionBuilder()
             token_ids = [tid.item() for tid in state_tensor if tid >= 0]
@@ -123,7 +128,16 @@ class GFNEnvCore(DiscreteEnv):
             if builder.is_valid():
                 try:
                     expr = builder.get_tree()
-                    reward = self.pool.try_new_expr(expr)
+                    
+                    # Compute embedding only for this valid expression
+                    embedding = None
+                    if self.encoder is not None:
+                        with torch.no_grad():
+                            # Add batch dimension for single state
+                            single_state = state_tensor.unsqueeze(0)
+                            embedding = self.encoder(single_state).squeeze(0)
+                            print(embedding)
+                    reward = self.pool.try_new_expr(expr, embedding)
                 except OutOfDataRangeError:
                     reward = 0.0
             

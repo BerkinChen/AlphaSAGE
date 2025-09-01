@@ -97,15 +97,16 @@ def train(args):
     # Initialize AlphaPoolGFN
     pool = AlphaPoolGFN(capacity=args.pool_capacity, stock_data=data, target=target)
 
-    # Initialize environment and model
-    env = GFNEnvCore(pool=pool, device=device)
-    
+    # Initialize model
     n_tokens = len(FEATURES) + len(OPERATORS) + len(DELTA_TIMES) + len(CONSTANTS)
     
     backbone = SequenceEncoder(
         n_tokens,
         args.encoder_type
     )
+    
+    # Initialize environment with encoder
+    env = GFNEnvCore(pool=pool, encoder=backbone, device=device)
     
     pf_head = NeuralNet(input_dim=HIDDEN_DIM, output_dim=env.n_actions, n_hidden_layers=0)
     pb_head = NeuralNet(input_dim=HIDDEN_DIM, output_dim=env.n_actions - 1, n_hidden_layers=0) # pb does not predict exit action
