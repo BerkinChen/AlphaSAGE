@@ -1,6 +1,7 @@
 import random
 from typing import List, Tuple, Optional
 import torch
+import numpy as np
 import math
 from torch import nn
 from gfn.env import DiscreteEnv
@@ -115,7 +116,6 @@ class GFNEnvCore(DiscreteEnv):
 
     def reward(self, final_states: DiscreteStates) -> torch.Tensor:
         rewards = []
-        
         for state_tensor in final_states.tensor:
             builder = ExpressionBuilder()
             token_ids = [tid.item() for tid in state_tensor if tid >= 0]
@@ -136,12 +136,12 @@ class GFNEnvCore(DiscreteEnv):
                             # Add batch dimension for single state
                             single_state = state_tensor.unsqueeze(0)
                             embedding = self.encoder(single_state).squeeze(0)
-                            print(embedding)
-                    reward = self.pool.try_new_expr(expr, embedding)
+                    ic_reward, ssl_reward = self.pool.try_new_expr_with_ssl(expr, embedding)
+                    print(f"IC Reward: {ic_reward}, SSL Reward: {ssl_reward}")
+                    reward = ic_reward + ssl_reward
                 except OutOfDataRangeError:
                     reward = 0.0
-            
-            rewards.append(reward)
+            rewards.append(np.maximum(reward, 1e-6))
         
         return torch.tensor(rewards, dtype=torch.float, device=self.device)
 
