@@ -25,11 +25,11 @@ class AlphaPoolGFN(AlphaPool):
         # Initialize embeddings storage with the same structure as other factor properties
         self.embeddings: List[Optional[Tensor]] = [None for _ in range(capacity + 1)]
 
-    def try_new_expr(self, expr: Expression, embedding: Optional[Tensor] = None) -> float:
+    def try_new_expr(self, expr: Expression, embedding: Optional[Tensor] = None) -> Tuple[float, float]:
         value = self._normalize_by_day(expr.evaluate(self.data))
         ic_ret, ic_mut = self._calc_ics(value, ic_mut_threshold=0.99)
         if ic_ret is None or ic_mut is None:
-            return 0.0
+            return 0.0, 1.0
         ic_ret = np.abs(ic_ret)
         ic_mut = np.abs(ic_mut)
         
@@ -38,21 +38,23 @@ class AlphaPoolGFN(AlphaPool):
             # Pool not full, add directly if correlation constraint is satisfied
             if ic_mut.size == 0 or np.max(ic_mut) <= self.ic_mut_threshold:
                 self._add_factor(expr, value, ic_ret, ic_mut, embedding)
-                print(f"[Pool +] {expr}")
+                print(f"[Pool Add] {expr}")
         else:
             # Pool is full, check if this factor is better than the worst one
             min_ic_idx = np.argmin(self.single_ics[:self.size])
             min_ic = self.single_ics[min_ic_idx]
             
             if ic_ret > min_ic and (ic_mut.size == 0 or np.max(ic_mut) <= self.ic_mut_threshold):
-                # Remove the worst factor
-                print(f"[Pool -] {self.exprs[min_ic_idx]}")
-                self._pop()
-                # Add the new factor
+                # Add the new factor first (this will make size = capacity + 1)
                 self._add_factor(expr, value, ic_ret, ic_mut, embedding)
-                print(f"[Pool +] {expr}")
+                print(f"[Pool Add] {expr}")
+                # Then remove the worst factor using _pop
+                print(f"[Pool Pop] {self.exprs[np.argmin(self.single_ics[:self.size])]}")
+                self._pop()
+            else:
+                print(f"[Pool Reject] {expr}")
         
-        return ic_ret
+        return ic_ret, (1 - np.max(ic_mut)) if ic_mut.size > 0 else 1.0
     
     def _add_factor(
         self,
@@ -68,6 +70,7 @@ class AlphaPoolGFN(AlphaPool):
         n = self.size - 1  # size was incremented in parent method
         self.embeddings[n] = embedding
     
+
     def _pop(self) -> None:
         # Pop the factor with the lowest ic
         if self.size <= self.capacity:
@@ -266,7 +269,7 @@ class AlphaPoolGFN(AlphaPool):
         
         return ssl_reward
     
-    def try_new_expr_with_ssl(self, expr: Expression, embedding: Optional[Tensor] = None) -> Tuple[float, float]:
+    def try_new_expr_with_ssl(self, expr: Expression, embedding: Optional[Tensor] = None) -> Tuple[float, float, float]:
         """
         Compute both IC reward and SSL reward separately
         
@@ -275,13 +278,13 @@ class AlphaPoolGFN(AlphaPool):
             embedding: The structural embedding of the expression
             
         Returns:
-            Tuple of (ic_reward, ssl_reward)
+            Tuple of (ic_reward, nov_reward, ssl_reward)
         """
         # print(f"\n[SSL Debug] ===== Computing IC + SSL Rewards =====")
         # print(f"[SSL Debug] Expression: {expr}")
         
         # Get IC reward first
-        ic_reward = self.try_new_expr(expr, embedding)
+        ic_reward, nov_reward = self.try_new_expr(expr, embedding)
         # print(f"[SSL Debug] IC reward: {ic_reward:.6f}")
         
         # Get SSL reward
@@ -295,7 +298,7 @@ class AlphaPoolGFN(AlphaPool):
         # print(f"[SSL Debug] Final rewards - IC: {ic_reward:.6f}, SSL: {ssl_reward:.6f}")
         # print(f"[SSL Debug] ===== IC + SSL Rewards Computation Done =====\n")
         
-        return ic_reward, ssl_reward
+        return ic_reward, nov_reward, ssl_reward
     
     def debug_embedding_similarities(self, query_embedding: Tensor) -> None:
         """

@@ -106,7 +106,12 @@ def train(args):
     )
     
     # Initialize environment with encoder and mask dropout
-    env = GFNEnvCore(pool=pool, encoder=backbone, device=device, mask_dropout_prob=args.mask_dropout_prob)
+    env = GFNEnvCore(pool=pool,
+                     encoder=backbone, 
+                     device=device, 
+                     mask_dropout_prob=args.mask_dropout_prob,
+                     ssl_weight=args.ssl_weight,
+                     nov_weight=args.nov_weight)
     
     pf_head = NeuralNet(input_dim=HIDDEN_DIM, output_dim=env.n_actions, n_hidden_layers=0)
     pb_head = NeuralNet(input_dim=HIDDEN_DIM, output_dim=env.n_actions - 1, n_hidden_layers=0) # pb does not predict exit action
@@ -184,5 +189,7 @@ if __name__ == '__main__':
     parser.add_argument('--entropy_coef', type=float, default=0.01, help='Coefficient for entropy regularization')
     parser.add_argument('--entropy_temperature', type=float, default=1.0, help='Temperature for entropy calculation')
     parser.add_argument('--mask_dropout_prob', type=float, default=0.5, help='Probability of masking out valid actions based on expression length')
+    parser.add_argument('--ssl_weight', type=float, default=0.1, help='Weight for SSL reward')
+    parser.add_argument('--nov_weight', type=float, default=0.1, help='Weight for novelty reward')
     args = parser.parse_args()
     train(args)

@@ -15,10 +15,17 @@ from ..alpha_pool import AlphaPoolGFN
 from ..preprocessors import IntegerPreprocessor
 
 class GFNEnvCore(DiscreteEnv):
-    def __init__(self, pool: AlphaPoolGFN, encoder: nn.Module = None, device: torch.device = torch.device('cuda:0'), mask_dropout_prob: float = 0.1):
+    def __init__(self, pool: AlphaPoolGFN, 
+                 encoder: nn.Module = None, 
+                 device: torch.device = torch.device('cuda:0'), 
+                 mask_dropout_prob: float = 0.1,
+                 ssl_weight: float = 0.1,
+                 nov_weight: float = 0.1):
         self.pool = pool
         self.encoder = encoder
         self.mask_dropout_prob = mask_dropout_prob
+        self.ssl_weight = ssl_weight
+        self.nov_weight = nov_weight
         self.builder = ExpressionBuilder()
         
         self.beg_token = [BEG_TOKEN]
@@ -152,8 +159,8 @@ class GFNEnvCore(DiscreteEnv):
                             # Add batch dimension for single state
                             single_state = state_tensor.unsqueeze(0)
                             embedding = self.encoder(single_state).squeeze(0)
-                    ic_reward, ssl_reward = self.pool.try_new_expr_with_ssl(expr, embedding)
-                    reward = ic_reward + ssl_reward
+                    ic_reward, nov_reward, ssl_reward = self.pool.try_new_expr_with_ssl(expr, embedding)
+                    reward = ic_reward + self.ssl_weight * ssl_reward + self.nov_weight * nov_reward
                 except OutOfDataRangeError:
                     reward = 0.0
             rewards.append(np.maximum(reward, np.exp(-10)))
