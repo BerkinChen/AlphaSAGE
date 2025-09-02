@@ -34,7 +34,7 @@ class AlphaPoolGFN(AlphaPool):
         ic_mut = np.abs(ic_mut)
         
         # Check if we should add this factor to the pool
-        if self.size <= self.capacity:
+        if self.size < self.capacity:
             # Pool not full, add directly if correlation constraint is satisfied
             if ic_mut.size == 0 or np.max(ic_mut) <= self.ic_mut_threshold:
                 self._add_factor(expr, value, ic_ret, ic_mut, embedding)
@@ -98,7 +98,7 @@ class AlphaPoolGFN(AlphaPool):
             List of indices of k nearest neighbors
         """
         if self.size <= 1:
-            print(f"[SSL Debug] Pool size <= 1 ({self.size}), no neighbors available")
+            # print(f"[SSL Debug] Pool size <= 1 ({self.size}), no neighbors available")
             return []
         
         distances = []
@@ -111,15 +111,15 @@ class AlphaPoolGFN(AlphaPool):
                 
                 # Skip if this is likely the same embedding (distance ≈ 0)
                 if exclude_self and dist < distance_threshold:
-                    print(f"[SSL Debug] Factor {i}: distance = {dist:.6f} (SKIPPED - too similar/identical)")
+                    # print(f"[SSL Debug] Factor {i}: distance = {dist:.6f} (SKIPPED - too similar/identical)")
                     continue
                     
                 distances.append(dist)
                 valid_indices.append(i)
-                print(f"[SSL Debug] Factor {i}: distance = {dist:.6f}")
+                # print(f"[SSL Debug] Factor {i}: distance = {dist:.6f}")
         
         if len(distances) == 0:
-            print(f"[SSL Debug] No valid embeddings found in pool (after excluding self)")
+            # print(f"[SSL Debug] No valid embeddings found in pool (after excluding self)")
             return []
         
         # Get k smallest distances (nearest neighbors)
@@ -129,8 +129,8 @@ class AlphaPoolGFN(AlphaPool):
         neighbor_indices = [valid_indices[idx] for idx in indices.tolist()]
         neighbor_distances = [distances[idx] for idx in indices.tolist()]
         
-        print(f"[SSL Debug] Found {len(neighbor_indices)} neighbors: {neighbor_indices}")
-        print(f"[SSL Debug] Neighbor distances: {[f'{d:.6f}' for d in neighbor_distances]}")
+        # print(f"[SSL Debug] Found {len(neighbor_indices)} neighbors: {neighbor_indices}")
+        # print(f"[SSL Debug] Neighbor distances: {[f'{d:.6f}' for d in neighbor_distances]}")
         
         return neighbor_indices
     
@@ -146,7 +146,7 @@ class AlphaPoolGFN(AlphaPool):
             Normalized similarity weights
         """
         if not neighbor_indices:
-            print(f"[SSL Debug] No neighbor indices provided")
+            # print(f"[SSL Debug] No neighbor indices provided")
             return torch.tensor([])
         
         # Calculate squared L2 distances
@@ -158,17 +158,17 @@ class AlphaPoolGFN(AlphaPool):
                 similarity_score = -dist_squared / self.ssl_tau  # Negative for similarity
                 distances.append(dist_squared.item())
                 similarity_scores.append(similarity_score)
-                print(f"[SSL Debug] Factor {idx}: dist²={dist_squared.item():.4f}, similarity_score={similarity_score.item():.4f}")
+                # print(f"[SSL Debug] Factor {idx}: dist²={dist_squared.item():.4f}, similarity_score={similarity_score.item():.4f}")
         
         if not similarity_scores:
-            print(f"[SSL Debug] No valid similarity scores computed")
+            # print(f"[SSL Debug] No valid similarity scores computed")
             return torch.tensor([])
         
         # Apply softmax to get normalized weights
         weights = F.softmax(torch.tensor(similarity_scores), dim=0)
         
-        print(f"[SSL Debug] Similarity weights: {[f'{w.item():.4f}' for w in weights]}")
-        print(f"[SSL Debug] Weight sum: {weights.sum().item():.4f}")
+        # print(f"[SSL Debug] Similarity weights: {[f'{w.item():.4f}' for w in weights]}")
+        # print(f"[SSL Debug] Weight sum: {weights.sum().item():.4f}")
         
         return weights
     
@@ -185,14 +185,14 @@ class AlphaPoolGFN(AlphaPool):
             Consistency loss value
         """
         if not neighbor_indices or len(weights) == 0:
-            print(f"[SSL Debug] No neighbors or weights for consistency loss")
+            # print(f"[SSL Debug] No neighbors or weights for consistency loss")
             return 0.0
         
         total_loss = 0.0
         individual_losses = []
         
-        print(f"[SSL Debug] Computing consistency loss with {len(neighbor_indices)} neighbors")
-        print(f"[SSL Debug] Query value shape: {query_value.shape}")
+        # print(f"[SSL Debug] Computing consistency loss with {len(neighbor_indices)} neighbors")
+        # print(f"[SSL Debug] Query value shape: {query_value.shape}")
         
         for i, idx in enumerate(neighbor_indices):
             if idx < len(self.values) and self.values[idx] is not None:
@@ -207,10 +207,10 @@ class AlphaPoolGFN(AlphaPool):
                 total_loss += weighted_loss
                 individual_losses.append(avg_mse)
                 
-                print(f"[SSL Debug] Neighbor {idx}: MSE={avg_mse:.6f}, weight={weights[i].item():.4f}, weighted_loss={weighted_loss:.6f}")
+                # print(f"[SSL Debug] Neighbor {idx}: MSE={avg_mse:.6f}, weight={weights[i].item():.4f}, weighted_loss={weighted_loss:.6f}")
         
-        print(f"[SSL Debug] Individual MSE losses: {[f'{loss:.6f}' for loss in individual_losses]}")
-        print(f"[SSL Debug] Total consistency loss: {total_loss:.6f}")
+        # print(f"[SSL Debug] Individual MSE losses: {[f'{loss:.6f}' for loss in individual_losses]}")
+        # print(f"[SSL Debug] Total consistency loss: {total_loss:.6f}")
         
         return total_loss
     
@@ -225,32 +225,32 @@ class AlphaPoolGFN(AlphaPool):
         Returns:
             SSL reward (positive value, higher is better)
         """
-        print(f"\n[SSL Debug] ===== Computing SSL Reward =====")
-        print(f"[SSL Debug] Pool size: {self.size}, K: {self.ssl_k}, τ: {self.ssl_tau}")
+        # print(f"\n[SSL Debug] ===== Computing SSL Reward =====")
+        # print(f"[SSL Debug] Pool size: {self.size}, K: {self.ssl_k}, τ: {self.ssl_tau}")
         
         if embedding is None:
-            print(f"[SSL Debug] No embedding provided, SSL reward = 0.0")
+            # print(f"[SSL Debug] No embedding provided, SSL reward = 0.0")
             return 0.0
             
         if self.size <= 1:
-            print(f"[SSL Debug] Pool size <= 1, SSL reward = 0.0")
+            # print(f"[SSL Debug] Pool size <= 1, SSL reward = 0.0")
             return 0.0
         
-        print(f"[SSL Debug] Query embedding shape: {embedding.shape}")
-        print(f"[SSL Debug] Query embedding norm: {torch.norm(embedding).item():.4f}")
+        # print(f"[SSL Debug] Query embedding shape: {embedding.shape}")
+        # print(f"[SSL Debug] Query embedding norm: {torch.norm(embedding).item():.4f}")
         
         # Find k nearest neighbors based on embedding similarity (excluding self)
         neighbor_indices = self._find_k_nearest_neighbors(embedding, self.ssl_k, exclude_self=True)
         
         if not neighbor_indices:
-            print(f"[SSL Debug] No neighbors found, SSL reward = 0.0")
+            # print(f"[SSL Debug] No neighbors found, SSL reward = 0.0")
             return 0.0
         
         # Compute similarity weights
         weights = self._compute_similarity_weights(embedding, neighbor_indices)
         
         if len(weights) == 0:
-            print(f"[SSL Debug] No weights computed, SSL reward = 0.0")
+            # print(f"[SSL Debug] No weights computed, SSL reward = 0.0")
             return 0.0
         
         # Get normalized factor values
@@ -261,8 +261,8 @@ class AlphaPoolGFN(AlphaPool):
         
         # Transform consistency loss to SSL reward
         ssl_reward = np.exp(-consistency_loss)
-        print(f"[SSL Debug] Final SSL reward: {ssl_reward:.6f}")
-        print(f"[SSL Debug] ===== SSL Reward Computation Done =====\n")
+        # print(f"[SSL Debug] Final SSL reward: {ssl_reward:.6f}")
+        # print(f"[SSL Debug] ===== SSL Reward Computation Done =====\n")
         
         return ssl_reward
     
@@ -277,22 +277,23 @@ class AlphaPoolGFN(AlphaPool):
         Returns:
             Tuple of (ic_reward, ssl_reward)
         """
-        print(f"\n[SSL Debug] ===== Computing IC + SSL Rewards =====")
-        print(f"[SSL Debug] Expression: {expr}")
+        # print(f"\n[SSL Debug] ===== Computing IC + SSL Rewards =====")
+        # print(f"[SSL Debug] Expression: {expr}")
         
         # Get IC reward first
         ic_reward = self.try_new_expr(expr, embedding)
-        print(f"[SSL Debug] IC reward: {ic_reward:.6f}")
+        # print(f"[SSL Debug] IC reward: {ic_reward:.6f}")
         
         # Get SSL reward
         ssl_reward = 0.0
         if embedding is not None:
             ssl_reward = self.compute_ssl_reward(expr, embedding)
         else:
-            print(f"[SSL Debug] No embedding provided, SSL reward = 0.0")
+            # print(f"[SSL Debug] No embedding provided, SSL reward = 0.0")
+            pass
         
-        print(f"[SSL Debug] Final rewards - IC: {ic_reward:.6f}, SSL: {ssl_reward:.6f}")
-        print(f"[SSL Debug] ===== IC + SSL Rewards Computation Done =====\n")
+        # print(f"[SSL Debug] Final rewards - IC: {ic_reward:.6f}, SSL: {ssl_reward:.6f}")
+        # print(f"[SSL Debug] ===== IC + SSL Rewards Computation Done =====\n")
         
         return ic_reward, ssl_reward
     
@@ -303,13 +304,13 @@ class AlphaPoolGFN(AlphaPool):
         Args:
             query_embedding: The embedding to compare against pool embeddings
         """
-        print(f"\n[SSL Debug] ===== Embedding Similarity Analysis =====")
-        print(f"[SSL Debug] Pool size: {self.size}")
-        print(f"[SSL Debug] Query embedding shape: {query_embedding.shape}")
-        print(f"[SSL Debug] Query embedding norm: {torch.norm(query_embedding).item():.6f}")
+        # print(f"\n[SSL Debug] ===== Embedding Similarity Analysis =====")
+        # print(f"[SSL Debug] Pool size: {self.size}")
+        # print(f"[SSL Debug] Query embedding shape: {query_embedding.shape}")
+        # print(f"[SSL Debug] Query embedding norm: {torch.norm(query_embedding).item():.6f}")
         
         if self.size == 0:
-            print(f"[SSL Debug] Empty pool")
+            # print(f"[SSL Debug] Empty pool")
             return
             
         for i in range(self.size):
@@ -318,8 +319,9 @@ class AlphaPoolGFN(AlphaPool):
                 cosine_sim = F.cosine_similarity(query_embedding.unsqueeze(0), self.embeddings[i].unsqueeze(0)).item()
                 
                 status = "IDENTICAL" if dist < 1e-6 else "DIFFERENT"
-                print(f"[SSL Debug] Factor {i}: L2_dist={dist:.6f}, cosine_sim={cosine_sim:.6f} [{status}]")
+                # print(f"[SSL Debug] Factor {i}: L2_dist={dist:.6f}, cosine_sim={cosine_sim:.6f} [{status}]")
             else:
-                print(f"[SSL Debug] Factor {i}: No embedding stored")
+                # print(f"[SSL Debug] Factor {i}: No embedding stored")
+                pass
                 
-        print(f"[SSL Debug] ===== Embedding Analysis Done =====\n")
+        # print(f"[SSL Debug] ===== Embedding Analysis Done =====\n")
