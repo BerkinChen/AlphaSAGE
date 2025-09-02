@@ -15,9 +15,10 @@ from ..alpha_pool import AlphaPoolGFN
 from ..preprocessors import IntegerPreprocessor
 
 class GFNEnvCore(DiscreteEnv):
-    def __init__(self, pool: AlphaPoolGFN, encoder: nn.Module = None, device: torch.device = torch.device('cuda:0')):
+    def __init__(self, pool: AlphaPoolGFN, encoder: nn.Module = None, device: torch.device = torch.device('cuda:0'), mask_dropout_prob: float = 0.1):
         self.pool = pool
         self.encoder = encoder
+        self.mask_dropout_prob = mask_dropout_prob
         self.builder = ExpressionBuilder()
         
         self.beg_token = [BEG_TOKEN]
@@ -110,6 +111,21 @@ class GFNEnvCore(DiscreteEnv):
             else:
                 valid_actions[-1] = True
             
+            # Apply random mask dropout based on expression length
+            # Longer expressions get higher dropout probability
+            expr_length = len(token_ids)
+            length_based_dropout_prob = self.mask_dropout_prob * (expr_length / MAX_EXPR_LENGTH)
+            
+            # set True actions to False (except the last action which is SEP)
+            true_indices = [i for i in range(len(valid_actions) - 1) if valid_actions[i]]  # Exclude last action
+            if valid_actions[-1] == True:
+                if np.random.rand() < length_based_dropout_prob:
+                    for idx in true_indices:
+                        valid_actions[idx] = False
+                    #print(f"[Mask Debug] Expr length: {expr_length}, Masked all {len(true_indices)} actions")
+            
+
+            
             batch_masks.append(valid_actions)
         
         states.forward_masks = torch.tensor(batch_masks, dtype=torch.bool, device=self.device)
@@ -137,11 +153,10 @@ class GFNEnvCore(DiscreteEnv):
                             single_state = state_tensor.unsqueeze(0)
                             embedding = self.encoder(single_state).squeeze(0)
                     ic_reward, ssl_reward = self.pool.try_new_expr_with_ssl(expr, embedding)
-                    print(f"IC Reward: {ic_reward}, SSL Reward: {ssl_reward}")
                     reward = ic_reward + ssl_reward
                 except OutOfDataRangeError:
                     reward = 0.0
-            rewards.append(np.maximum(reward, 1e-6))
+            rewards.append(np.maximum(reward, np.exp(-10)))
         
         return torch.tensor(rewards, dtype=torch.float, device=self.device)
 
