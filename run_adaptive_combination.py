@@ -169,7 +169,7 @@ def run(args):
             'ricir': ricir.cpu().numpy()
         })
         
-        good_factors = metrics_df[(metrics_df['ric'] > 0.02) & (metrics_df['ricir'] > 0.2)]
+        good_factors = metrics_df[(metrics_df['ric'].abs() > 0.02) & (metrics_df['ricir'].abs() > 0.2)]
         if len(good_factors) < 1:
             good_factors = metrics_df.reindex(metrics_df.ricir.abs().sort_values(ascending=False).index).iloc[:1]
         
