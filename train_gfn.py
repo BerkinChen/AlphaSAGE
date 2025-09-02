@@ -6,6 +6,7 @@ import os
 import json
 from datetime import datetime
 from torch.optim import Adam
+from torch.optim.lr_scheduler import LinearLR, ExponentialLR, PolynomialLR
 from torch.distributions import Categorical
 from torch import nn
 from tqdm import tqdm
@@ -80,6 +81,63 @@ class GFNLogger:
         self.writer.close()
 
 
+class WeightScheduler:
+    """A scheduler for managing weight decay using PyTorch schedulers"""
+    
+    def __init__(self, initial_ssl_weight, initial_nov_weight, final_ratio, total_steps, scheduler_type='linear'):
+        self.initial_ssl_weight = initial_ssl_weight
+        self.initial_nov_weight = initial_nov_weight
+        self.final_ssl_weight = initial_ssl_weight * final_ratio
+        self.final_nov_weight = initial_nov_weight * final_ratio
+        self.total_steps = total_steps
+        self.scheduler_type = scheduler_type
+        
+        # Create dummy parameters and optimizers for using PyTorch schedulers
+        self.ssl_param = nn.Parameter(torch.tensor(initial_ssl_weight))
+        self.nov_param = nn.Parameter(torch.tensor(initial_nov_weight))
+        
+        # Create dummy optimizers (we won't actually use them for optimization)
+        self.ssl_optimizer = Adam([self.ssl_param], lr=1.0)
+        self.nov_optimizer = Adam([self.nov_param], lr=1.0)
+        
+        # Create schedulers based on type
+        if scheduler_type == 'linear':
+            # LinearLR decays from start_factor to end_factor
+            start_factor = 1.0
+            end_factor = final_ratio
+            self.ssl_scheduler = LinearLR(self.ssl_optimizer, start_factor=start_factor, 
+                                        end_factor=end_factor, total_iters=total_steps)
+            self.nov_scheduler = LinearLR(self.nov_optimizer, start_factor=start_factor, 
+                                        end_factor=end_factor, total_iters=total_steps)
+        elif scheduler_type == 'exponential':
+            # ExponentialLR multiplies by gamma each step
+            gamma = (final_ratio) ** (1.0 / total_steps)
+            self.ssl_scheduler = ExponentialLR(self.ssl_optimizer, gamma=gamma)
+            self.nov_scheduler = ExponentialLR(self.nov_optimizer, gamma=gamma)
+        elif scheduler_type == 'polynomial':
+            # PolynomialLR with power=1 is linear, power=2 is quadratic, etc.
+            self.ssl_scheduler = PolynomialLR(self.ssl_optimizer, total_iters=total_steps, 
+                                           power=2.0, end_factor=final_ratio)
+            self.nov_scheduler = PolynomialLR(self.nov_optimizer, total_iters=total_steps, 
+                                           power=2.0, end_factor=final_ratio)
+        else:
+            raise ValueError(f"Unknown scheduler type: {scheduler_type}")
+    
+    def step(self):
+        """Step both schedulers"""
+        self.ssl_scheduler.step()
+        self.nov_scheduler.step()
+    
+    def get_current_weights(self):
+        """Get current weight values"""
+        ssl_lr = self.ssl_scheduler.get_last_lr()[0]
+        nov_lr = self.nov_scheduler.get_last_lr()[0]
+        
+        current_ssl_weight = self.initial_ssl_weight * ssl_lr
+        current_nov_weight = self.initial_nov_weight * nov_lr
+        
+        return current_ssl_weight, current_nov_weight
+
 def train(args):
     # Reproducibility
     torch.manual_seed(args.seed)
@@ -140,7 +198,7 @@ def train(args):
     log_dir = os.path.join(
         'data/gfn_logs',
         f'pool_{args.pool_capacity}',
-        f'gfn_{args.encoder_type}_{args.instrument}_{args.pool_capacity}_{args.seed}-{timestamp}'
+        f'gfn_{args.encoder_type}_{args.instrument}_{args.pool_capacity}_{args.seed}-{args.entropy_coef}-{args.entropy_temperature}-{args.ssl_weight}-{args.nov_weight}-{args.weight_decay_type}-{args.final_weight_ratio}'
     )
     os.makedirs(log_dir, exist_ok=True)
     logger = GFNLogger(pf, pool, log_dir, data_test, target)
@@ -150,8 +208,30 @@ def train(args):
     minibatch_loss = 0
     update_freq = args.update_freq
     n_episodes = args.n_episodes
+    
+    # Initialize weight scheduler using PyTorch schedulers
+    weight_scheduler = WeightScheduler(
+        initial_ssl_weight=args.ssl_weight,
+        initial_nov_weight=args.nov_weight,
+        final_ratio=args.final_weight_ratio,
+        total_steps=n_episodes,
+        scheduler_type=args.weight_decay_type
+    )
+    
+    print(f"Weight decay strategy: {args.weight_decay_type} (using PyTorch schedulers)")
+    print(f"SSL weight: {args.ssl_weight:.4f} -> {args.ssl_weight * args.final_weight_ratio:.4f}")
+    print(f"Novelty weight: {args.nov_weight:.4f} -> {args.nov_weight * args.final_weight_ratio:.4f}")
+    print(f"Training episodes: {n_episodes}")
+    print("=" * 50)
 
     for episode in tqdm(range(n_episodes)):
+        # Get current weights from scheduler
+        current_ssl_weight, current_nov_weight = weight_scheduler.get_current_weights()
+        
+        # Update environment weights
+        env.ssl_weight = current_ssl_weight
+        env.nov_weight = current_nov_weight
+        
         save_estimator_outputs = args.entropy_coef > 0
         trajectories = sampler.sample_trajectories(
             env=env, n_trajectories=1, save_estimator_outputs=save_estimator_outputs
@@ -173,7 +253,18 @@ def train(args):
             logger.save_checkpoint(episode)
             logger.show_pool_state()
             print(f"----Episode {episode}/{n_episodes} done----")
+            print(f"Current weights: SSL={current_ssl_weight:.4f}, Novelty={current_nov_weight:.4f}")
             
+            # Log weight decay to tensorboard
+            logger.writer.add_scalar('weights/ssl_weight', current_ssl_weight, episode)
+            logger.writer.add_scalar('weights/nov_weight', current_nov_weight, episode)
+        
+        # Step the weight scheduler at the end of each episode
+        weight_scheduler.step()
+    # last save
+    print(f"Saving checkpoint at episode {n_episodes - 1}")
+    logger.save_checkpoint(n_episodes - 1)
+    logger.show_pool_state()
     logger.close()
 
 
@@ -182,14 +273,16 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--instrument', type=str, default='csi300')
     parser.add_argument('--pool_capacity', type=int, default=10)
-    parser.add_argument('--log_freq', type=int, default=100)
+    parser.add_argument('--log_freq', type=int, default=1000)
     parser.add_argument('--update_freq', type=int, default=128)
     parser.add_argument('--n_episodes', type=int, default=1_000)
     parser.add_argument('--encoder_type', type=str, default='lstm', choices=['transformer', 'lstm', 'gnn'])
     parser.add_argument('--entropy_coef', type=float, default=0.01, help='Coefficient for entropy regularization')
     parser.add_argument('--entropy_temperature', type=float, default=1.0, help='Temperature for entropy calculation')
     parser.add_argument('--mask_dropout_prob', type=float, default=0.5, help='Probability of masking out valid actions based on expression length')
-    parser.add_argument('--ssl_weight', type=float, default=0.1, help='Weight for SSL reward')
-    parser.add_argument('--nov_weight', type=float, default=0.1, help='Weight for novelty reward')
+    parser.add_argument('--ssl_weight', type=float, default=0.5, help='Initial weight for SSL reward (will decay during training)')
+    parser.add_argument('--nov_weight', type=float, default=0.5, help='Initial weight for novelty reward (will decay during training)')
+    parser.add_argument('--weight_decay_type', type=str, default='linear', choices=['linear', 'exponential', 'polynomial'], help='Type of weight decay to apply')
+    parser.add_argument('--final_weight_ratio', type=float, default=0.0, help='Final weight as ratio of initial weight (e.g., 0.1 means decay to 10% of initial)')
     args = parser.parse_args()
     train(args)
