@@ -26,9 +26,10 @@ class EntropyTBGFlowNet(TBGFlowNet):
         TT["n_trajectories", torch.float],
         TT["n_trajectories", torch.float],
         TT["n_trajectories", torch.float],
+        TT["n_trajectories", torch.float]
     ]:
         if self.entropy_coef <= 0:
-            return super().get_trajectories_scores(trajectories, recalculate_all_logprobs)
+            return (*super().get_trajectories_scores(trajectories, recalculate_all_logprobs), torch.zeros(trajectories.n_trajectories, device=trajectories.states.device))
 
         log_pf, log_pb, scores = super().get_trajectories_scores(
             trajectories, recalculate_all_logprobs
@@ -75,7 +76,30 @@ class EntropyTBGFlowNet(TBGFlowNet):
 
                 entropy_term = entropy.sum() * self.entropy_coef
 
-        new_scores = scores - entropy_term
+        return log_pf, log_pb, scores, entropy_term
+    
+    def loss(
+        self,
+        env: Env,
+        trajectories: Trajectories,
+        recalculate_all_logprobs: bool = False,
+    ) -> TT[0, float]:
+        """Trajectory balance loss.
 
-        return log_pf, log_pb, new_scores
+        The trajectory balance loss is described in 2.3 of
+        [Trajectory balance: Improved credit assignment in GFlowNets](https://arxiv.org/abs/2201.13259))
+
+        Raises:
+            ValueError: if the loss is NaN.
+        """
+        del env  # unused
+        _, _, scores, entropy_term = self.get_trajectories_scores(
+            trajectories, recalculate_all_logprobs=recalculate_all_logprobs
+        )
+        loss = (scores + self.logZ).pow(2).mean() + entropy_term.mean()
+        if torch.isnan(loss):
+            # set inf
+            loss = torch.tensor(float('inf'))
+
+        return loss
 
