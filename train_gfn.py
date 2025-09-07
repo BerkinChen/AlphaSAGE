@@ -198,7 +198,7 @@ def train(args):
     log_dir = os.path.join(
         'data/gfn_logs',
         f'pool_{args.pool_capacity}',
-        f'gfn_{args.encoder_type}_{args.instrument}_{args.pool_capacity}_{args.seed}-{args.entropy_coef}-{args.entropy_temperature}-{args.ssl_weight}-{args.nov_weight}-{args.weight_decay_type}-{args.final_weight_ratio}'
+        f'gfn_{args.encoder_type}_{args.instrument}_{args.pool_capacity}_{args.seed}-{args.entropy_coef}-{args.entropy_temperature}-{args.mask_dropout_prob}-{args.ssl_weight}-{args.nov_weight}-{args.weight_decay_type}-{args.final_weight_ratio}'
     )
     os.makedirs(log_dir, exist_ok=True)
     logger = GFNLogger(pf, pool, log_dir, data_test, target)
@@ -241,14 +241,14 @@ def train(args):
         if loss is not None and torch.isfinite(loss):
             minibatch_loss += loss
             
-        if episode > 0 and episode % update_freq == 0 and minibatch_loss != 0:
+        if episode > 0 and (episode + 1) % update_freq == 0 and minibatch_loss != 0:
             losses.append(minibatch_loss.item())
             minibatch_loss.backward()
             optimizer.step()
             optimizer.zero_grad()
             minibatch_loss = 0
 
-        if episode > 0 and episode % args.log_freq == 0:
+        if episode > 0 and (episode + 1) % args.log_freq == 0:
             logger.log_metrics(episode)
             logger.save_checkpoint(episode)
             logger.show_pool_state()
@@ -261,10 +261,7 @@ def train(args):
         
         # Step the weight scheduler at the end of each episode
         weight_scheduler.step()
-    # last save
-    print(f"Saving checkpoint at episode {n_episodes - 1}")
-    logger.save_checkpoint(n_episodes - 1)
-    logger.show_pool_state()
+
     logger.close()
 
 
@@ -285,4 +282,5 @@ if __name__ == '__main__':
     parser.add_argument('--weight_decay_type', type=str, default='linear', choices=['linear', 'exponential', 'polynomial'], help='Type of weight decay to apply')
     parser.add_argument('--final_weight_ratio', type=float, default=0.0, help='Final weight as ratio of initial weight (e.g., 0.1 means decay to 10% of initial)')
     args = parser.parse_args()
+    print(args)
     train(args)
