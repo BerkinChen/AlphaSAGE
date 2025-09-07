@@ -49,7 +49,7 @@ def get_tensor_metrics(x, y):
     if y.dim() > 2: y = y.squeeze(-1)
 
     ic_s = batch_pearsonr(x, y)
-    ric_s = chunk_batch_spearmanr(x, y, chunk_size=400)
+    ric_s = chunk_batch_spearmanr(x, y, chunk_size=args.chunk_size)
     ret_s = batch_ret(x, y)
 
     ic_s = torch.nan_to_num(ic_s, nan=0.)
@@ -126,7 +126,7 @@ def run(args):
         factor_slice = fct_tensor[..., i]
         target_slice = tgt_tensor[..., 0]
         ic_s = batch_pearsonr(factor_slice, target_slice)
-        ric_s = chunk_batch_spearmanr(factor_slice, target_slice, chunk_size=400)
+        ric_s = chunk_batch_spearmanr(factor_slice, target_slice, chunk_size=args.chunk_size)
         ret_s = batch_ret(factor_slice, target_slice)
         ic_list.append(torch.nan_to_num(ic_s, nan=0.))
         ric_list.append(torch.nan_to_num(ric_s, nan=0.))
@@ -168,7 +168,7 @@ def run(args):
             'ric': ric_mean.cpu().numpy(),
             'ricir': ricir.cpu().numpy()
         })
-        
+
         good_factors = metrics_df[(metrics_df['ric'].abs() > 0.02) & (metrics_df['ricir'].abs() > 0.2)]
         if len(good_factors) < 1:
             good_factors = metrics_df.reindex(metrics_df.ricir.abs().sort_values(ascending=False).index).iloc[:1]
@@ -234,7 +234,18 @@ def run(args):
     # Format and print results
     results_df = pd.DataFrame([valid_results, test_results], index=['Validation', 'Test'])
     print("\n--- Final Performance Metrics ---")
+    
+    # Print with full precision and no truncation
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.width', None)
+    pd.set_option('display.max_colwidth', None)
     print(results_df.round(4))
+    
+    # Also print in a more parseable format
+    print("\n--- Parseable Format ---")
+    for index, row in results_df.iterrows():
+        print(f"{index:<12} {row['ic']:>8.4f} {row['ic_std']:>8.4f} {row['icir']:>8.4f} {row['ric']:>8.4f} {row['ric_std']:>8.4f} {row['ricir']:>8.4f} {row['ret']:>8.4f} {row['ret_std']:>8.4f} {row['retir']:>8.4f}")
+    
     print("="*50)
 
 
@@ -248,6 +259,8 @@ if __name__ == '__main__':
     parser.add_argument('--cuda', type=int, default=0)
     parser.add_argument('--n_factors', type=int, default=10,
                         help='Maximum number of factors to select at each step.')
+    parser.add_argument('--chunk_size', type=int, default=400,
+                        help='Chunk size for calculating Spearman correlation.')
     parser.add_argument('--window', type=str, default='inf',
                         help="Rolling window size for factor evaluation. 'inf' for expanding window.")
     
