@@ -107,7 +107,9 @@ class SequenceEncoder(nn.Module):
         self.n_tokens = n_tokens
         self.beg_token_id = 0
         
-        self.token_embedding = nn.Embedding(self.n_tokens + 2, HIDDEN_DIM, padding_idx=-1)
+        # Reserve one extra id for padding; use a valid non-negative padding index
+        self.padding_id = self.n_tokens + 1
+        self.token_embedding = nn.Embedding(self.n_tokens + 2, HIDDEN_DIM, padding_idx=self.padding_id)
         
         if encoder_type == 'transformer':
             self.pos_enc = PositionalEncoding(HIDDEN_DIM)
@@ -153,7 +155,11 @@ class SequenceEncoder(nn.Module):
             state_tokens = torch.cat([beg_tokens, state_tokens], dim=1)
             padding_mask = self._make_padding_mask(state_tokens)
             
-            state_embedding = self.pos_enc(self.token_embedding(state_tokens))
+            # Remap -1 paddings to a valid padding id before embedding to avoid CUDA asserts
+            state_tokens_for_embedding = state_tokens.clone()
+            state_tokens_for_embedding[state_tokens_for_embedding == -1] = self.padding_id
+            
+            state_embedding = self.pos_enc(self.token_embedding(state_tokens_for_embedding))
             
             if isinstance(self.encoder, nn.TransformerEncoder):
                 hidden_states = self.encoder(state_embedding, src_key_padding_mask=padding_mask)
