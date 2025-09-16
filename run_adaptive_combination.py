@@ -169,7 +169,7 @@ def run(args):
             'ricir': ricir.cpu().numpy()
         })
 
-        good_factors = metrics_df[(metrics_df['ric'].abs() > 0.02) & (metrics_df['ricir'].abs() > 0.2)]
+        good_factors = metrics_df[(metrics_df['ric'].abs() > args.threshold_ric) & (metrics_df['ricir'].abs() > args.threshold_ricir)]
         if len(good_factors) < 1:
             good_factors = metrics_df.reindex(metrics_df.ricir.abs().sort_values(ascending=False).index).iloc[:1]
         
@@ -255,6 +255,8 @@ if __name__ == '__main__':
                         help='Path to a JSON file containing a list of alpha expressions.')
     parser.add_argument('--instruments', type=str, default='csi300')
     parser.add_argument('--train_end_year', type=int, default=2020)
+    parser.add_argument('--threshold_ric', type=float, default=0.015)
+    parser.add_argument('--threshold_ricir', type=float, default=0.15)
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--cuda', type=int, default=0)
     parser.add_argument('--n_factors', type=int, default=10,

@@ -38,7 +38,7 @@ def run(args):
     valid_start_time = f'{args.train_end_year + 1}-01-01'
     valid_end_time = f'{args.train_end_year + 1}-12-31'
     test_start_time = f'{args.train_end_year + 2}-01-01'
-    test_end_time = f'{args.train_end_year + 2}-12-31'
+    test_end_time = f'{args.train_end_year + 4}-12-31'
 
     data = StockData(instrument=args.instruments,
                            start_time=train_start_time,
