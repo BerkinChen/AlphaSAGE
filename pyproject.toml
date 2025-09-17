@@ -24,6 +24,8 @@ dependencies = [
     "seaborn>=0.13.2",
     "torchgfn>=1.2.1",
     "torch-geometric>=2.6.1",
+    "xgboost>=3.0.5",
+    "yahooquery>=2.4.1",
 ]
 requires-python = ">=3.11"
 readme = "README.md"

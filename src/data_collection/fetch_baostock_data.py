@@ -11,7 +11,7 @@ from contextlib import redirect_stdout
 import baostock as bs
 from baostock.data.resultset import ResultData
 
-from alphastruct.data_collection.qlib_dump_bin import DumpDataAll
+from data_collection.qlib_dump_bin import DumpDataAll
 
 
 def _read_all_text(path: str) -> str:
