@@ -1,19 +1,6 @@
 
 import os
 import argparse
-parser = argparse.ArgumentParser()
-parser.add_argument('--instrument',type=str,default='csi300')
-parser.add_argument('--seed',type=str,default='[0,1,2,3,4]')
-parser.add_argument('--years',type=str,default='[2016]')
-parser.add_argument('--freq',type=str,default='day')
-parser.add_argument('--cuda',type=str,default='0')
-
-
-args = parser.parse_args()
-instruments = args.instrument
-args.seed = eval(args.seed)
-args.years = eval(args.years)
-
 import json
 from collections import Counter
 
@@ -133,7 +120,7 @@ def run(args):
     valid_start_time = f'{args.train_end_year + 1}-01-01'
     valid_end_time = f'{args.train_end_year + 1}-12-31'
     test_start_time = f'{args.train_end_year + 2}-01-01'
-    test_end_time = f'{args.train_end_year + 2}-12-31'
+    test_end_time = f'{args.train_end_year + 4}-12-31'
 
     data = StockData(instrument=args.instruments,
                            start_time=train_start_time,
@@ -194,7 +181,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--instruments', type=str, default='csi300')
     parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--train-end-year', type=int, default=2016)
+    parser.add_argument('--train-end-year', type=int, default=2020)
     parser.add_argument('--freq', type=str, default='day')
     parser.add_argument('--cuda', type=str, default='0')
     args = parser.parse_args()

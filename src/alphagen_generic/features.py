@@ -8,4 +8,4 @@ volume = Volume = VOLUME = Feature(FeatureType.VOLUME)
 open_ = Open = OPEN = Feature(FeatureType.OPEN)
 close = Close = CLOSE = Feature(FeatureType.CLOSE)
 vwap = Vwap = VWAP = Feature(FeatureType.VWAP)
-target = Ref(close, -21) / Ref(close, -1) - 1
+target = Ref(close, -20) / close - 1
