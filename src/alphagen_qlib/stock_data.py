@@ -69,8 +69,13 @@ class StockData:
         if cls._qlib_initialized:
             return
         import qlib
-        from qlib.config import REG_CN
-        qlib.init(provider_uri=qlib_path, region=REG_CN)
+        from qlib.config import REG_CN, REG_US
+        if 'us' in qlib_path:
+            region = REG_US
+        else:
+            region = REG_CN
+        print(qlib_path, region)
+        qlib.init(provider_uri=qlib_path, region=region)
         cls._qlib_initialized = True
 
     def _load_exprs(self, exprs: Union[str, List[str]]) -> pd.DataFrame:

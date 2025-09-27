@@ -19,7 +19,7 @@ from gplearn.genetic import SymbolicRegressor
 from gan.utils.data import get_data_by_year
 from datetime import datetime
 
-QLIB_PATH = '/DATA1/home/chenbq/AlphaStruct/data/qlib_data/cn_data_rolling'
+QLIB_PATH = '/DATA1/home/chenbq/AlphaStruct/data/qlib_data/us_data_qlib'
 
 def _metric(x, y, w):
     key = y[0]
@@ -148,7 +148,7 @@ def run(args):
     target_factor_test = target.evaluate(data_test)
 
     
-    features = ['open_', 'close', 'high', 'low', 'volume', 'vwap']
+    features = ['open_', 'close', 'high', 'low', 'volume']
     constants = [f'Constant({v})' for v in [-30., -10., -5., -2., -1., -0.5, -0.01, 0.01, 0.5, 1., 2., 5., 10., 30.]]
     terminals = features + constants
 

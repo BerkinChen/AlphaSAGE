@@ -9,7 +9,8 @@ FEATURES = [FeatureType.OPEN,
             FeatureType.HIGH,
             FeatureType.LOW,
             FeatureType.VOLUME,
-            FeatureType.VWAP]
+            FeatureType.VWAP
+            ]
 
 OPERATORS = [
     # Unary

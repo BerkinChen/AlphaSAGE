@@ -35,11 +35,12 @@ def get_data_by_year(
 
     except:
         print('Data not exist, load from qlib')
-        data = get_data_my(instruments, train_start, train_end,raw = True,qlib_path = qlib_path,freq=freq)
-        data_valid = get_data_my(instruments, valid_start, valid_end,raw = True,qlib_path = qlib_path,freq=freq)
-        data_valid_withhead = get_data_my(instruments,valid_head_start, valid_end,raw = True,qlib_path = qlib_path,freq=freq)
-        data_test = get_data_my(instruments, test_start, test_end,raw = True,qlib_path = qlib_path,freq=freq)
-        data_test_withhead = get_data_my(instruments, test_head_start, test_end,raw = True,qlib_path = qlib_path,freq=freq)
+        print(f"qlib_path: {qlib_path}")
+        data = get_data_my(instruments, train_start, train_end,raw =False,qlib_path = qlib_path,freq=freq)
+        data_valid = get_data_my(instruments, valid_start, valid_end,raw = False,qlib_path = qlib_path,freq=freq)
+        data_valid_withhead = get_data_my(instruments,valid_head_start, valid_end,raw = False,qlib_path = qlib_path,freq=freq)
+        data_test = get_data_my(instruments, test_start, test_end,raw = False,qlib_path = qlib_path,freq=freq)
+        data_test_withhead = get_data_my(instruments, test_head_start, test_end,raw = False,qlib_path = qlib_path,freq=freq)
 
         os.makedirs(f"pkl/{name}",exist_ok=True)
         save_pickle(data,f'pkl/{name}/data.pkl')
@@ -51,6 +52,6 @@ def get_data_by_year(
     try:
         data_all = load_pickle(f'pkl/{name}/data_all.pkl')
     except:
-        data_all = get_data_my(instruments, train_start, test_end,raw = True,qlib_path = qlib_path,freq=freq)
+        data_all = get_data_my(instruments, train_start, test_end,raw = False,qlib_path = qlib_path,freq=freq)
         save_pickle(data_all,f'pkl/{name}/data_all.pkl')
     return data_all,data,data_valid,data_valid_withhead,data_test,data_test_withhead,name

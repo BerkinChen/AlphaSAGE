@@ -10,10 +10,12 @@ from alphagen_qlib.calculator import QLibStockDataCalculator
 from alphagen.models.alpha_pool import AlphaPool
 from alphagen.rl.env.wrapper import AlphaEnv
 
-QLIB_PATH = '/DATA1/home/chenbq/AlphaStruct/data/qlib_data/cn_data_rolling'
 
 def run(args):
-
+    if args.instruments == 'sp500':
+        QLIB_PATH = '/DATA1/home/chenbq/AlphaStruct/data/qlib_data/us_data_qlib'
+    else:
+        QLIB_PATH = '/DATA1/home/chenbq/AlphaStruct/data/qlib_data/cn_data_rolling'
     # torch.cuda.set_device(args.cuda)
     config_path = os.path.join('config/qcm_config', f'{args.model}.yaml')
 
@@ -54,11 +56,11 @@ def run(args):
     name = args.model
     time = datetime.now().strftime("%Y%m%d-%H%M")
     if name in ['qrdqn', 'iqn']:
-        log_dir = os.path.join('data/csi300_logs',
+        log_dir = os.path.join(f'data/{args.instruments}_logs',
                            f'pool_{args.pool}_QCM_{args.std_lam}',
                            f"{name}-seed{args.seed}-{time}-N{config['N']}-lr{config['lr']}-per{config['use_per']}-gamma{config['gamma']}-step{config['multi_step']}")
     elif name == 'fqf':
-        log_dir = os.path.join('data/csi300_logs',
+        log_dir = os.path.join(f'data/{args.instruments}_logs',
                            f'pool_{args.pool}_QCM_{args.std_lam}',
                            f"{name}-seed{args.seed}-{time}-N{config['N']}-lr{config['quantile_lr']}-per{config['use_per']}-gamma{config['gamma']}-step{config['multi_step']}")
 

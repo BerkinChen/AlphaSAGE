@@ -19,7 +19,6 @@ from alphagen.utils.random import reseed_everything
 from alphagen.rl.env.core import AlphaEnvCore
 from alphagen_qlib.calculator import QLibStockDataCalculator
 
-QLIB_PATH = '/DATA1/home/chenbq/AlphaStruct/data/qlib_data/cn_data_rolling'
 class CustomCallback(BaseCallback):
     def __init__(self,
                  save_freq: int,
@@ -96,6 +95,10 @@ class CustomCallback(BaseCallback):
 def run(args):
     reseed_everything(args.seed)
 
+    if args.instruments == 'sp500':
+        QLIB_PATH = '/DATA1/home/chenbq/AlphaStruct/data/qlib_data/us_data_qlib'
+    else:
+        QLIB_PATH = '/DATA1/home/chenbq/AlphaStruct/data/qlib_data/cn_data_rolling'
     device = torch.device('cuda')
     close = Feature(FeatureType.CLOSE)
     target = Ref(close, -20) / close - 1

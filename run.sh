@@ -1,15 +1,15 @@
-CUDA_VISIBLE_DEVICES=0 python train_gfn.py \
+CUDA_VISIBLE_DEVICES=3 python train_gfn.py \
         --seed 0 \
-        --instrument csi300 \
+        --instrument sp500 \
         --pool_capacity 50 \
         --log_freq 500 \
         --update_freq 64 \
-        --n_episodes 10000 \
+        --n_episodes 20000 \
         --encoder_type gnn \
-        --entropy_coef 0.00 \
+        --entropy_coef 0.01 \
         --entropy_temperature 1.0 \
         --mask_dropout_prob 1.0 \
-        --ssl_weight 0.0 \
+        --ssl_weight 1.0 \
         --nov_weight 0.3 \
         --weight_decay_type linear \
         --final_weight_ratio 0.0
