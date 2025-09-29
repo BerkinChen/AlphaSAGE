@@ -1,4 +1,4 @@
-# Alpha<u>SAGE</u>: <u>S</u>tructure-Aware <u>A</u>lpha Mining via <u>G</u>FlowNets for Robust <u>E</u>xploration
+# <p align="center"> AlphaSAGE: Structure-Aware Alpha Mining via GFlowNets for Robust Exploration</p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License">
