@@ -205,7 +205,6 @@ get_baostock_data.py
 *.whl
 *.pt
 *.pkl
-*.png
 *.npy
 *.svg
 out22/
