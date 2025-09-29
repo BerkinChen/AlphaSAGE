@@ -1,4 +1,4 @@
-# AlphaSAGE: Structure-Aware Alpha Mining via GFlowNets for Robust Exploration
+# Alpha<font color="cyan">SAGE</font>: <font color="cyan">S</font>tructure-Aware <font color="cyan">A</font>lpha Mining via <font color="cyan">G</font>FlowNets for Robust <font color="cyan">E</font>xploration
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.11+-green.svg)](https://python.org)
