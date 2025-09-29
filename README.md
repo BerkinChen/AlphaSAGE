@@ -2,6 +2,7 @@
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.11+-green.svg)](https://python.org)
+[![Stars](https://img.shields.io/github/stars/BerkinChen/AlphaSAGE.svg)](https://github.com/BerkinChen/AlphaSAGE/stargazers)
 
 This repository contains the official implementation of **AlphaSAGE** (Structure-Aware Alpha Mining via Generative Flow Networks for Robust Exploration), a novel framework for automated mining of predictive signals (alphas) in quantitative finance.
 
