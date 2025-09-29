@@ -1,8 +1,14 @@
-# Alpha<font color="cyan">SAGE</font>: <font color="cyan">S</font>tructure-Aware <font color="cyan">A</font>lpha Mining via <font color="cyan">G</font>FlowNets for Robust <font color="cyan">E</font>xploration
+# Alpha<u>SAGE</u>: <u>S</u>tructure-Aware <u>A</u>lpha Mining via <u>G</u>FlowNets for Robust <u>E</u>xploration
 
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.11+-green.svg)](https://python.org)
-[![Stars](https://img.shields.io/github/stars/BerkinChen/AlphaSAGE.svg)](https://github.com/BerkinChen/AlphaSAGE/stargazers)
+<p align="center">
+  <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License">
+  <img src="https://img.shields.io/badge/Python-3.11+-green.svg" alt="Python">
+  <img src="https://img.shields.io/github/stars/BerkinChen/AlphaSAGE.svg" alt="Stars">
+</p>
+
+---
+
+</div>
 
 This repository contains the official implementation of **AlphaSAGE** (Structure-Aware Alpha Mining via Generative Flow Networks for Robust Exploration), a novel framework for automated mining of predictive signals (alphas) in quantitative finance.
 
