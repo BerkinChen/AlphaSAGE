@@ -154,9 +154,9 @@ def run(args):
     os.environ["CUDA_VISIBLE_DEVICES"]=str(args.cuda)
     reseed_everything(args.seed)
     if args.instruments == 'sp500':
-        QLIB_PATH = '/DATA1/home/chenbq/AlphaStruct/data/qlib_data/us_data_qlib'
+        QLIB_PATH = '/your_path/data/qlib_data/us_data_qlib'
     else:
-        QLIB_PATH = '/DATA1/home/chenbq/AlphaStruct/data/qlib_data/cn_data_rolling'
+        QLIB_PATH = '/your_path/data/qlib_data/cn_data_rolling'
     close = Feature(FeatureType.CLOSE)
     target = Ref(close, -20) / close - 1
     

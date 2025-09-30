@@ -146,9 +146,9 @@ def train(args):
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     if args.instrument == 'sp500':
-        QLIB_PATH = '/DATA1/home/chenbq/AlphaStruct/data/qlib_data/us_data_qlib'
+        QLIB_PATH = '/your_path/data/qlib_data/us_data_qlib'
     else:    
-        QLIB_PATH = '/DATA1/home/chenbq/AlphaStruct/data/qlib_data/cn_data_rolling'
+        QLIB_PATH = '/your_path/data/qlib_data/cn_data_rolling'
     # Initialize StockData and target expression
     data = StockData(instrument=args.instrument, start_time='2010-01-01', end_time='2016-12-31', qlib_path=QLIB_PATH)
     data_test = StockData(instrument=args.instrument, start_time='2018-01-01', end_time='2020-12-31', qlib_path=QLIB_PATH)

@@ -1,10 +1,10 @@
 import datetime
 import json
 from typing import List, Tuple
-from alphastruct.alphagen.data.expression import *
-from alphastruct.alphagen_generic.features import *
+from alphagen.data.expression import *
+from alphagen_generic.features import *
 
-from alphastruct.alphagen_qlib.stock_data import StockData
+from alphagen_qlib.stock_data import StockData
 
 
 def load_recent_data(instrument: str,

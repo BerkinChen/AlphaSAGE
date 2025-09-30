@@ -5,9 +5,9 @@ import numpy as np
 import pandas as pd
 from qlib.contrib.strategy.signal_strategy import BaseSignalStrategy
 from qlib.backtest.decision import Order, OrderDir, TradeDecisionWO
-from alphastruct.alphagen.trade.base import StockCode, StockPosition, StockSignal, StockStatus
+from alphagen.trade.base import StockCode, StockPosition, StockSignal, StockStatus
 
-from alphastruct.alphagen.trade.strategy import Strategy
+from alphagen.trade.strategy import Strategy
 
 
 class TopKSwapNStrategy(BaseSignalStrategy, Strategy):

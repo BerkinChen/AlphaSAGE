@@ -13,9 +13,9 @@ from alphagen.rl.env.wrapper import AlphaEnv
 
 def run(args):
     if args.instruments == 'sp500':
-        QLIB_PATH = '/DATA1/home/chenbq/AlphaStruct/data/qlib_data/us_data_qlib'
+        QLIB_PATH = '/your_path/data/qlib_data/us_data_qlib'
     else:
-        QLIB_PATH = '/DATA1/home/chenbq/AlphaStruct/data/qlib_data/cn_data_rolling'
+        QLIB_PATH = '/your_path/data/qlib_data/cn_data_rolling'
     # torch.cuda.set_device(args.cuda)
     config_path = os.path.join('config/qcm_config', f'{args.model}.yaml')
 

@@ -19,7 +19,7 @@ from gplearn.genetic import SymbolicRegressor
 from gan.utils.data import get_data_by_year
 from datetime import datetime
 
-QLIB_PATH = '/DATA1/home/chenbq/AlphaStruct/data/qlib_data/us_data_qlib'
+QLIB_PATH = '/your_path/data/qlib_data/us_data_qlib'
 
 def _metric(x, y, w):
     key = y[0]
