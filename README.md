@@ -3,7 +3,6 @@
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License">
   <img src="https://img.shields.io/badge/Python-3.11+-green.svg" alt="Python">
-  <img src="https://img.shields.io/github/stars/BerkinChen/AlphaSAGE.svg" alt="Stars">
 </p>
 
 ---
@@ -174,7 +173,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🤝 Contributing
 
 We welcome contributions! Please feel free to submit a Pull Request.
-
-## 📞 Contact
-
-For questions or issues, please open an issue on GitHub or contact [cbq@stu.pku.edu.cn](cbq@stu.pku.edu.cn).
