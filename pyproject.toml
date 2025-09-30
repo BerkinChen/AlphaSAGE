@@ -2,9 +2,6 @@
 name = "AlphaSAGE"
 version = "0.1.0"
 description = "Default template for PDM package"
-authors = [
-    {name = "BerkinChen", email = "berkinchen@gmail.com"},
-]
 dependencies = [
     "numpy>=2.3.2",
     "torch @ https://download.pytorch.org/whl/cu121/torch-2.4.0%2Bcu121-cp311-cp311-linux_x86_64.whl",
