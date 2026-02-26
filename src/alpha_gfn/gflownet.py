@@ -96,7 +96,7 @@ class EntropyTBGFlowNet(TBGFlowNet):
         _, _, scores, entropy_term = self.get_trajectories_scores(
             trajectories, recalculate_all_logprobs=recalculate_all_logprobs
         )
-        loss = (scores + self.logZ).pow(2).mean() + entropy_term.mean()
+        loss = (scores + self.logZ).pow(2).mean() - entropy_term.mean()
         if torch.isnan(loss):
             # set inf
             loss = torch.tensor(float('inf'))
