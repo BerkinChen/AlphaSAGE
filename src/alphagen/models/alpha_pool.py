@@ -205,7 +205,7 @@ class AlphaPool(AlphaPoolBase):
         mutual_ics = []
         for i in range(self.size):
             mutual_ic = batch_pearsonr(value, self.values[i]).mean().item()  # type: ignore
-            if ic_mut_threshold is not None and mutual_ic > ic_mut_threshold:
+            if ic_mut_threshold is not None and abs(mutual_ic) > ic_mut_threshold:
                 return None, None
             mutual_ics.append(mutual_ic)
 
@@ -299,7 +299,7 @@ class AlphaPoolMinICConstrained(AlphaPool):
         mutual_ics = []
         for i in range(self.size):
             mutual_ic = batch_pearsonr(value, self.values[i]).mean().item()  # type: ignore
-            if ic_mut_threshold is not None and mutual_ic > ic_mut_threshold:
+            if ic_mut_threshold is not None and abs(mutual_ic) > ic_mut_threshold:
                 return single_ic, None
             mutual_ics.append(mutual_ic)
 
