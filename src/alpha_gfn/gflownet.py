@@ -96,6 +96,10 @@ class EntropyTBGFlowNet(TBGFlowNet):
         _, _, scores, entropy_term = self.get_trajectories_scores(
             trajectories, recalculate_all_logprobs=recalculate_all_logprobs
         )
+        # Subtracting entropy_term (which is positive when entropy_coef > 0) from the
+        # TB loss means minimising `loss` simultaneously minimises the TB objective AND
+        # maximises policy entropy — encouraging diverse exploration. The sign is correct.
+        # See Issue #2 for discussion.
         loss = (scores + self.logZ).pow(2).mean() - entropy_term.mean()
         if torch.isnan(loss):
             # set inf
