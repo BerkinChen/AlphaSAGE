@@ -87,7 +87,10 @@ class DataManager:
         print("Loading A-Shares stock list")
         self._login_baostock()
         self._load_all_a_shares_base()
-        qry = bs.query_all_stock(day=str(datetime.date.today()))
+        # baostock returns empty results on non-trading days (weekends/holidays).
+        # Use the most recent business day to avoid ValueError on data reshaping.
+        last_bday = pd.bdate_range(end=datetime.date.today(), periods=1)[0]
+        qry = bs.query_all_stock(day=last_bday.strftime('%Y-%m-%d'))
         stocks = {code for code in self._result_to_data_frame(qry)["code"]
                   if code.startswith("sh") or code.startswith("sz")}
         self._all_a_shares += ["sh.000903", "sh.000300", "sh.000905", "sh.000852"]
